@@ -83,6 +83,12 @@ class _TestPageState extends State<TestPage> {
         'musicInfo': {'songmid': _songmidCtrl.text.trim(), 'name': 'song'},
       };
       if (action == 'musicUrl') info['type'] = _quality;
+      final r = await engine.request(
+        source: _sourceKey,
+        action: action,
+        info: info,
+      );
+      setState(() => _result = '$action: $r');
     } catch (e) {
       setState(() => _result = 'error: $e');
     }

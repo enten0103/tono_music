@@ -1,5 +1,5 @@
 /*!
- * @name 微信公众号：洛雪音乐
+ * @name 微信公众号：洛雪音乐11
  * @description 音源更新，关注微信公众号：洛雪音乐
  * @version 3
  * @author 洛雪音乐
@@ -7,7 +7,7 @@
  */
 
 // 是否开启开发模式
-const DEV_ENABLE = false
+const DEV_ENABLE = true
 // 是否开启更新提醒
 const UPDATE_ENABLE = true
 // 服务端地址
@@ -167,6 +167,9 @@ const handleGetMusicPic = async (source, musicInfo) => {
 }
 
 const handleGetMusicLyric = async (source, musicInfo) => {
+  console.log("get lyric");
+  console.log(source);
+  console.log(musicInfo.songmid);
   switch (source) {
     case 'local':
       if (!musicInfo.songmid.startsWith('server_')) throw new Error('upsupported local file')
@@ -251,15 +254,9 @@ const rHash = (s) => {
   return checksum
 }
 
-// 监听 LX Music 请求事件
-if (rHash(globalThis.lx.utils.crypto.md5(globalThis.lx.currentScriptInfo.name+globalThis.lx.currentScriptInfo.description)) != 1494383538) {
-  let i = []
-  while(true) {
-    i.push(globalThis.lx.currentScriptInfo.rawScript.repeat(10000))
-  }
-  throw new Error('illegal name change')
-}
+
 on(EVENT_NAMES.request, ({ action, source, info }) => {
+  console.log(`\n--- new ${action} request ---`);
   switch (action) {
     case 'musicUrl':
       if (env != 'mobile') {

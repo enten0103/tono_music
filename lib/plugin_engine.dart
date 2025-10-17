@@ -4,8 +4,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_js/flutter_js.dart';
 import 'package:flutter_js/extensions/fetch.dart';
-import 'package:flutter_js/extensions/xhr.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:encrypt/encrypt.dart' as enc;
 
 /// JS 插件引擎：基于 flutter_js，把 music_souce.md 约定的 globalThis.lx 注入到 JS 运行时中。
 ///
@@ -37,18 +37,37 @@ class PluginEngine {
       (initedPayload?['sources'] as Map?)?.cast<String, dynamic>() ?? {};
 
   /// 初始化运行时并注入桥接
-  static Future<PluginEngine> create({bool enableFetch = true}) async {
+  static Future<PluginEngine> create() async {
     final rt = getJavascriptRuntime();
-    // 处理 Promise 与 fetch/xhr
     rt.enableHandlePromises();
-    if (enableFetch) {
-      await rt.enableFetch();
-    } else {
-      rt.enableXhr();
-    }
+    await rt.enableFetch();
+    final engine = PluginEngine._(rt);
+    return engine;
+  }
 
-  final engine = PluginEngine._(rt);
-  return engine;
+  /// Dart 主动发起一次请求，对应 JS on(EVENT_NAMES.request) 的回调，返回 Promise 结果
+  Future<dynamic> request({
+    required String source,
+    required String action,
+    required Map<String, dynamic> info,
+  }) async {
+    final argsJson = jsonEncode({
+      'source': source,
+      'action': action,
+      'info': info,
+    });
+    final code = "__lx_emit_request(JSON.parse(${jsonEncode(argsJson)}))";
+    final res = await _rt.evaluateAsync(code, sourceUrl: 'request_call.js');
+    final handled = await _rt.handlePromise(res);
+    if (handled.isError) {
+      throw Exception('request error: ${handled.stringResult}');
+    }
+    final str = handled.stringResult;
+    try {
+      return jsonDecode(str);
+    } catch (_) {
+      return str;
+    }
   }
 
   /// 释放资源
@@ -64,32 +83,71 @@ class PluginEngine {
     String sourceUrl = 'plugin.js',
   }) async {
     currentScriptInfo = _parseHeaderComment(script);
-    final headerJson = jsonEncode(currentScriptInfo ?? {});
+    // 避免把原脚本全文放进 header，缩小对象并过滤无效值，防止注入时 JSON -> 对象转换异常
+    final safeHeader = <String, dynamic>{}
+      ..addAll({
+        if ((currentScriptInfo?['name'] ?? '').toString().isNotEmpty)
+          'name': currentScriptInfo!['name'],
+        if ((currentScriptInfo?['description'] ?? '').toString().isNotEmpty)
+          'description': currentScriptInfo!['description'],
+        if ((currentScriptInfo?['version'] ?? '').toString().isNotEmpty)
+          'version': currentScriptInfo!['version'],
+        if ((currentScriptInfo?['author'] ?? '').toString().isNotEmpty)
+          'author': currentScriptInfo!['author'],
+        if ((currentScriptInfo?['homepage'] ?? '').toString().isNotEmpty)
+          'homepage': currentScriptInfo!['homepage'],
+      });
+    final headerJson = jsonEncode(safeHeader);
 
     // 安装 lx 对象与事件系统（异步从 assets 加载）
     await _installLxObject(headerJson);
 
     // 提供 dart->js 的 __app_emit(channel,argsJson) 实现：在 js 中 lx.send 调用时回调到 dart
+
     _rt.onMessage('__lx_send__', (dynamic args) {
-      // args 通常是单元素 List，元素为 JSON 字符串，如: ["[event, payloadJson]"]
+      // 兼容多种通道数据形态，避免对非 JSON 进行 jsonDecode 直接抛错
       try {
-        if (args is List && args.isNotEmpty) {
-          final raw = args.first?.toString() ?? '';
-          if (raw.isEmpty) return;
-          final decoded = jsonDecode(raw);
-          if (decoded is List && decoded.isNotEmpty) {
-            final eventName = decoded[0]?.toString() ?? '';
-            Map<String, dynamic>? data;
-            if (decoded.length > 1 && decoded[1] is String && (decoded[1] as String).isNotEmpty) {
-              try {
-                data = jsonDecode(decoded[1] as String) as Map<String, dynamic>;
-              } catch (_) {
-                data = null;
-              }
+        List<dynamic>? tuple;
+        if (args is List && args.length == 1 && args.first is String) {
+          // ["[event, payloadJson]"] 或 ["event,payload"]
+          final s = args.first as String;
+          try {
+            final d = jsonDecode(s);
+            if (d is List) tuple = d;
+          } catch (_) {
+            return;
+          }
+        } else if (args is List && args.length >= 2) {
+          // [event, payloadJson]
+          tuple = args;
+        } else if (args is String) {
+          // "[event, payloadJson]"
+          try {
+            final d = jsonDecode(args);
+            if (d is List) tuple = d;
+          } catch (_) {
+            return;
+          }
+        } else {
+          return;
+        }
+
+        if (tuple == null || tuple.isEmpty) return;
+        final eventName = tuple[0]?.toString() ?? '';
+        Map<String, dynamic>? data;
+        if (tuple.length > 1) {
+          final p = tuple[1];
+          if (p is String && p.isNotEmpty) {
+            try {
+              data = jsonDecode(p) as Map<String, dynamic>;
+            } catch (_) {
+              data = null;
             }
-            _handleJsSend(eventName, data);
+          } else if (p is Map) {
+            data = Map<String, dynamic>.from(p);
           }
         }
+        _handleJsSend(eventName, data);
       } catch (e, s) {
         if (kDebugMode) {
           print('handle __lx_send__ error: $e\n$s');
@@ -97,7 +155,55 @@ class PluginEngine {
       }
     });
 
+    // 处理加密请求: __lx_crypto__
+    _rt.onMessage('__lx_crypto__', (dynamic args) async {
+      try {
+        String raw;
+        if (args is List && args.isNotEmpty) {
+          raw = args.first?.toString() ?? '';
+        } else if (args is String) {
+          raw = args;
+        } else {
+          return;
+        }
+        if (raw.isEmpty) return;
+        final Map<String, dynamic> payload = jsonDecode(raw);
+        final String id = payload['id']?.toString() ?? '';
+        final String op = payload['op']?.toString() ?? '';
+        if (op != 'aesEncrypt' || id.isEmpty) return;
+        final String mode = (payload['mode']?.toString() ?? 'cbc')
+            .toLowerCase();
+        final String keyStr = payload['key']?.toString() ?? '';
+        final String ivStr = payload['iv']?.toString() ?? '';
+        final String dataB64 = payload['data']?.toString() ?? '';
+
+        // 执行 AES 加密并回传
+        final outB64 = await _aesEncryptBase64(dataB64, mode, keyStr, ivStr);
+        _rt.evaluate(
+          "__lx_crypto_resolve('$id','$outB64')",
+          sourceUrl: 'crypto_resolve.js',
+        );
+      } catch (e) {
+        // 回传错误
+        try {
+          String id = '';
+          if (args is List && args.isNotEmpty) {
+            final raw = args.first?.toString() ?? '';
+            if (raw.isNotEmpty) {
+              final map = jsonDecode(raw);
+              id = map['id']?.toString() ?? '';
+            }
+          }
+          _rt.evaluate(
+            "__lx_crypto_reject('$id', '${e.toString().replaceAll("'", "\\'")}')",
+            sourceUrl: 'crypto_reject.js',
+          );
+        } catch (_) {}
+      }
+    });
+
     // 安装 __lx_emit_request 到 js 全局，供 dart 调用
+
     _rt.evaluate(_emitRequestFunction, sourceUrl: 'emit_request.js');
 
     // 执行用户脚本
@@ -108,6 +214,50 @@ class PluginEngine {
     }
   }
 
+  // AES(CBC/ECB + PKCS7) 加密，输入数据 base64，输出 base64
+  Future<String> _aesEncryptBase64(
+    String inputBase64,
+    String mode,
+    String key,
+    String iv,
+  ) async {
+    // 解码输入
+    final data = base64Decode(inputBase64);
+    // key/iv 处理：支持 16/24/32 长度，不足则补零，超长则截断
+    List<int> fixLen(List<int> bytes, int len) {
+      if (bytes.length == len) return bytes;
+      if (bytes.length > len) return bytes.sublist(0, len);
+      return bytes + List<int>.filled(len - bytes.length, 0);
+    }
+
+    final keyBytes = fixLen(
+      utf8.encode(key),
+      (key.length >= 32) ? 32 : (key.length >= 24 ? 24 : 16),
+    );
+    final ivBytes = fixLen(utf8.encode(iv), 16);
+    final k = enc.Key(Uint8List.fromList(keyBytes));
+    final i = enc.IV(Uint8List.fromList(ivBytes));
+    late final enc.Encrypter encrypter;
+    switch (mode) {
+      case 'ecb':
+        encrypter = enc.Encrypter(
+          enc.AES(k, mode: enc.AESMode.ecb, padding: 'PKCS7'),
+        );
+        break;
+      case 'cbc':
+      default:
+        encrypter = enc.Encrypter(
+          enc.AES(k, mode: enc.AESMode.cbc, padding: 'PKCS7'),
+        );
+        break;
+    }
+    final encrypted = mode == 'ecb'
+        ? encrypter.encryptBytes(data)
+        : encrypter.encryptBytes(data, iv: i);
+    return base64Encode(encrypted.bytes);
+  }
+
+  //加载lx对象
   Future<void> _installLxObject(String headerJson) async {
     // 读取 assets/lx_bridge.js 并替换占位符为实际 header JSON
     final tpl = await rootBundle.loadString('assets/lx_bridge.js');
@@ -122,6 +272,7 @@ class PluginEngine {
     _eventController.add(PluginEvent(event, data));
   }
 
+  /// 获取脚本头部信息
   Map<String, dynamic> _parseHeaderComment(String script) {
     // 匹配 /** ... */ 或 /*! ... */ 里的 @tag 值
     RegExp reg1 = RegExp(r"/\*\*([\s\S]*?)\*/");
