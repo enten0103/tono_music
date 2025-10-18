@@ -16,6 +16,7 @@ dependencies:
   music_sdk:
     git:
       url: https://github.com/enten0103/music_sdk
+  get: ^4.7.2
 
 dev_dependencies:
   flutter_test:
