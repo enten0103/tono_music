@@ -60,6 +60,90 @@
 				"$dart-build"
 			],
 			"group": "build"
+		},
+		{
+			"label": "flutter-analyze",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"analyze"
+			],
+			"problemMatcher": [
+				"$dart-build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "flutter-analyze",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"analyze"
+			],
+			"problemMatcher": [
+				"$dart-build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "flutter-analyze",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"analyze"
+			],
+			"problemMatcher": [
+				"$dart-build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "flutter-analyze",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"analyze"
+			],
+			"problemMatcher": [
+				"$dart-build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "flutter-analyze",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"analyze"
+			],
+			"problemMatcher": [
+				"$dart-build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "flutter-analyze",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"analyze"
+			],
+			"problemMatcher": [
+				"$dart-build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "flutter-analyze",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"analyze"
+			],
+			"problemMatcher": [
+				"$dart-build"
+			],
+			"group": "build"
 		}
 	]
 }

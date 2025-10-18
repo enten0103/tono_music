@@ -293,10 +293,10 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "1ddac1c64f475e25c39d4ab2aa84bc6024dece56"
+      resolved-ref: "1edbb0032762ab6d33a35cedc0142ced65c6b7f2"
       url: "https://github.com/enten0103/music_sdk"
     source: git
-    version: "0.0.1"
+    version: "0.0.2"
   path:
     dependency: transitive
     description:
