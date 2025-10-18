@@ -268,15 +268,6 @@ class PluginEngine {
       onTimeout: () {
         throw Exception(
           '插件初始化超时：未在 ${timeout.inSeconds}s 内收到 inited 事件。\n'
-          '可能原因：\n'
-          '1) 插件在初始化阶段依赖的网络请求失败或被拦截（例如明文 HTTP 被系统限制）；\n'
-          '2) 插件脚本未调用 send(EVENT_NAMES.inited)；\n'
-          '3) 运行环境异常导致初始化逻辑未执行。\n'
-          '建议：\n'
-          '- 优先改用 HTTPS 接口；\n'
-          '- Android 可在 Manifest 中启用 usesCleartextTraffic 或配置 networkSecurityConfig 放行域名；\n'
-          '- iOS 可在 Info.plist 的 ATS 中为目标域名添加例外；\n'
-          '- 或检查脚本逻辑是否在初始化路径上调用了 inited。\n'
           'source: $sourceUrl',
         );
       },

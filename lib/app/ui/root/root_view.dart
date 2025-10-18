@@ -6,6 +6,7 @@ import '../search/search_view.dart';
 import '../favorite/favorite_view.dart';
 import '../settings/settings_view.dart';
 import '../../widgets/desktop_title_bar.dart';
+import '../../widgets/global_mini_player.dart';
 
 class RootView extends GetView<RootController> {
   const RootView({super.key});
@@ -28,37 +29,45 @@ class RootView extends GetView<RootController> {
         // 宽屏：侧边导航
         return Scaffold(
           appBar: const DesktopTitleBar(title: 'TonoMusic'),
-          body: Row(
+          body: Column(
             children: [
-              NavigationRail(
-                selectedIndex: idx,
-                onDestinationSelected: controller.setIndex,
-                labelType: NavigationRailLabelType.all,
-                destinations: const [
-                  NavigationRailDestination(
-                    icon: Icon(Icons.apps_outlined),
-                    selectedIcon: Icon(Icons.apps),
-                    label: Text('广场'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.search_outlined),
-                    selectedIcon: Icon(Icons.search),
-                    label: Text('搜索'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.favorite_border),
-                    selectedIcon: Icon(Icons.favorite),
-                    label: Text('收藏'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings),
-                    label: Text('设置'),
-                  ),
-                ],
+              Expanded(
+                child: Row(
+                  children: [
+                    NavigationRail(
+                      selectedIndex: idx,
+                      onDestinationSelected: controller.setIndex,
+                      labelType: NavigationRailLabelType.all,
+                      destinations: const [
+                        NavigationRailDestination(
+                          icon: Icon(Icons.apps_outlined),
+                          selectedIcon: Icon(Icons.apps),
+                          label: Text('广场'),
+                        ),
+                        NavigationRailDestination(
+                          icon: Icon(Icons.search_outlined),
+                          selectedIcon: Icon(Icons.search),
+                          label: Text('搜索'),
+                        ),
+                        NavigationRailDestination(
+                          icon: Icon(Icons.favorite_border),
+                          selectedIcon: Icon(Icons.favorite),
+                          label: Text('收藏'),
+                        ),
+                        NavigationRailDestination(
+                          icon: Icon(Icons.settings_outlined),
+                          selectedIcon: Icon(Icons.settings),
+                          label: Text('设置'),
+                        ),
+                      ],
+                    ),
+                    const VerticalDivider(width: 1),
+                    Expanded(child: content),
+                  ],
+                ),
               ),
-              const VerticalDivider(width: 1),
-              Expanded(child: content),
+              // 全局迷你播放器（仅在播放时显示）
+              const _RootMiniPlayerSlot(),
             ],
           ),
         );
@@ -67,29 +76,35 @@ class RootView extends GetView<RootController> {
         return Scaffold(
           appBar: const DesktopTitleBar(title: 'TonoMusic'),
           body: content,
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: idx,
-            onDestinationSelected: controller.setIndex,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.apps_outlined),
-                selectedIcon: Icon(Icons.apps),
-                label: '广场',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.search_outlined),
-                selectedIcon: Icon(Icons.search),
-                label: '搜索',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.favorite_border),
-                selectedIcon: Icon(Icons.favorite),
-                label: '收藏',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: '设置',
+          bottomNavigationBar: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _RootMiniPlayerSlot(),
+              NavigationBar(
+                selectedIndex: idx,
+                onDestinationSelected: controller.setIndex,
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.apps_outlined),
+                    selectedIcon: Icon(Icons.apps),
+                    label: '广场',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.search_outlined),
+                    selectedIcon: Icon(Icons.search),
+                    label: '搜索',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.favorite_border),
+                    selectedIcon: Icon(Icons.favorite),
+                    label: '收藏',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings),
+                    label: '设置',
+                  ),
+                ],
               ),
             ],
           ),
@@ -100,3 +115,14 @@ class RootView extends GetView<RootController> {
 }
 
 // 页面由对应模块提供
+
+class _RootMiniPlayerSlot extends StatelessWidget {
+  const _RootMiniPlayerSlot();
+
+  @override
+  Widget build(BuildContext context) {
+    // 播放页不显示（避免重复）
+    if (Get.currentRoute.contains('/song')) return const SizedBox.shrink();
+    return const GlobalMiniPlayer();
+  }
+}

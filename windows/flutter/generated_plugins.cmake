@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   flutter_js
+  just_audio_windows
   screen_retriever_windows
   window_manager
 )

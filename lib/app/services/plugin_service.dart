@@ -249,6 +249,52 @@ class PluginService extends GetxService {
     );
   }
 
+  /// 显式指定源的便捷方法：按给定 source 依序尝试音质，获取歌曲 URL。
+  /// 不会修改当前的 selectedSource/selectedType。
+  Future<String> getMusicUrlForSource({
+    required String source,
+    required Map<String, dynamic> musicInfo,
+    String? preferredType,
+  }) async {
+    final eng = engine;
+    if (eng == null) throw Exception('engine not ready');
+    final spec = sources[source];
+    final qualitys = spec?.qualitys ?? const <String>[];
+
+    final List<String?> candidates = [];
+    final start = (preferredType ?? '').trim();
+    if (start.isNotEmpty && qualitys.contains(start)) {
+      candidates.add(start);
+      for (final q in qualitys) {
+        if (q != start) candidates.add(q);
+      }
+    } else if (qualitys.isNotEmpty) {
+      for (final q in qualitys) {
+        candidates.add(q);
+      }
+    } else {
+      candidates.add(null);
+    }
+
+    Object? lastError;
+    for (final c in candidates) {
+      try {
+        final url = await eng.getMusicUrl(
+          source: source,
+          type: c,
+          musicInfo: musicInfo,
+        );
+        return url;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    final tried = candidates.map((e) => e ?? '').join(',');
+    throw Exception(
+      'getMusicUrlForSource failed for source=$source, tried types=[$tried], lastError=$lastError',
+    );
+  }
+
   // 设置当前 source，必要时自动修正当前 type
   void setSource(String source) {
     selectedSource.value = source;

@@ -16,7 +16,7 @@ Future<void> main() async {
       size: Size(1280, 800),
       minimumSize: Size(900, 600),
       center: true,
-      titleBarStyle: TitleBarStyle.hidden, // 隐藏系统标题栏，改为Flutter自绘
+      titleBarStyle: TitleBarStyle.hidden,
     );
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
@@ -34,6 +34,7 @@ Future<void> main() async {
   } catch (_) {
     // 忽略读取失败
   }
+  AppBinding.dependencies();
   runApp(const App());
 }
 
@@ -48,8 +49,8 @@ class App extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
+        fontFamily: 'OppoSans',
       ),
-      initialBinding: AppBinding(),
       initialRoute: AppRoutes.home,
       getPages: AppPages.routes,
       defaultTransition: Transition.cupertino,

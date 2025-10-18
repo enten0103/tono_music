@@ -8,6 +8,7 @@ import '../ui/settings/test_plugin/test_plugin_binding.dart';
 import '../ui/settings/test_plugin/test_plugin_view.dart';
 import '../ui/playlist_detail/playlist_detail_binding.dart';
 import '../ui/playlist_detail/playlist_detail_view.dart';
+import '../ui/song/song_view.dart';
 
 class AppPages {
   static final routes = <GetPage<dynamic>>[
@@ -33,6 +34,11 @@ class AppPages {
       name: AppRoutes.playlistDetail,
       page: () => const PlaylistDetailView(),
       binding: PlaylistDetailBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRoutes.song,
+      page: () => const SongView(),
       transition: Transition.cupertino,
     ),
   ];
