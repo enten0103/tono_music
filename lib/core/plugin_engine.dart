@@ -20,9 +20,9 @@ import 'package:encrypt/encrypt.dart' as enc;
 /// - 仅实现了 music_souce.md 所需的最小集合（EVENTS/on/send/request）。
 /// - utils.buffer/crypto/zlib 暂未实现，如需可继续扩展。
 class PluginEngine {
-  PluginEngine._(this._rt);
+  PluginEngine._();
 
-  final JavascriptRuntime _rt;
+  late JavascriptRuntime _rt;
 
   Map<String, dynamic>? currentScriptInfo; // 解析的头部信息
   Map<String, dynamic>? initedPayload; // 脚本 inited 时上报的数据（sources、openDevTools）
@@ -32,17 +32,56 @@ class PluginEngine {
 
   Stream<PluginEvent> get events => _eventController.stream;
 
-  /// sources 快照，便于 UI 展示
-  Map<String, dynamic> get sources =>
-      (initedPayload?['sources'] as Map?)?.cast<String, dynamic>() ?? {};
+  // 元信息便捷访问
+  String get name => (currentScriptInfo?['name'] ?? '').toString();
+  String get description =>
+      (currentScriptInfo?['description'] ?? '').toString();
+  String get version => (currentScriptInfo?['version'] ?? '').toString();
+  String get author => (currentScriptInfo?['author'] ?? '').toString();
+
+  /// 获取当前脚本信息（默认不包含原始脚本内容）
+  Map<String, dynamic> getCurrentScriptInfo({bool includeRaw = false}) {
+    final info = currentScriptInfo ?? const {};
+    // 标准化返回字段结构，均为字符串（不存在时返回空字符串）
+    final normalized = <String, dynamic>{
+      'name': (info['name'] ?? '').toString(),
+      'description': (info['description'] ?? '').toString(),
+      'version': (info['version'] ?? '').toString(),
+      'author': (info['author'] ?? '').toString(),
+      'homepage': (info['homepage'] ?? '').toString(),
+      'sourceUrl': (info['sourceUrl'] ?? '').toString(),
+    };
+    if (includeRaw && info.containsKey('rawScript')) {
+      normalized['rawScript'] = info['rawScript'];
+    }
+    return normalized;
+  }
+
+  // 小写别名，便于外部按习惯调用
+  Map<String, dynamic> getcurrentScriptInfo({bool includeRaw = false}) =>
+      getCurrentScriptInfo(includeRaw: includeRaw);
 
   /// 初始化运行时并注入桥接
   static Future<PluginEngine> create() async {
-    final rt = getJavascriptRuntime();
-    rt.enableHandlePromises();
-    await rt.enableFetch();
-    final engine = PluginEngine._(rt);
+    final engine = PluginEngine._();
+    await engine._initRuntime();
     return engine;
+  }
+
+  Future<void> _initRuntime() async {
+    _rt = getJavascriptRuntime();
+    _rt.enableHandlePromises();
+    await _rt.enableFetch();
+  }
+
+  /// 重置运行时：用于在导入新脚本前清理环境，避免重复声明
+  Future<void> reset() async {
+    try {
+      _rt.dispose();
+    } catch (_) {}
+    initedPayload = null;
+    currentScriptInfo = null;
+    await _initRuntime();
   }
 
   /// Dart 主动发起一次请求，对应 JS on(EVENT_NAMES.request) 的回调，返回 Promise 结果
@@ -76,27 +115,32 @@ class PluginEngine {
     _rt.dispose();
   }
 
-  /// 执行 JS 脚本字符串。
+  /// 执行 JS 脚本字符串，并返回脚本在初始化完成后通过
+  /// lx.send(EVENT_NAMES.inited, { openDevTools, sources }) 上报的对象。
   /// 会先解析脚本头注释并设置 globalThis.lx.currentScriptInfo。
-  Future<void> loadScript(
+  Future<Map<String, dynamic>> loadScript(
     String script, {
     String sourceUrl = 'plugin.js',
+    Duration? initTimeout,
   }) async {
     currentScriptInfo = _parseHeaderComment(script);
+    // 记录脚本来源，便于管理/调试
+    currentScriptInfo!['sourceUrl'] = sourceUrl;
     // 避免把原脚本全文放进 header，缩小对象并过滤无效值，防止注入时 JSON -> 对象转换异常
-    final safeHeader = <String, dynamic>{}
-      ..addAll({
-        if ((currentScriptInfo?['name'] ?? '').toString().isNotEmpty)
-          'name': currentScriptInfo!['name'],
-        if ((currentScriptInfo?['description'] ?? '').toString().isNotEmpty)
-          'description': currentScriptInfo!['description'],
-        if ((currentScriptInfo?['version'] ?? '').toString().isNotEmpty)
-          'version': currentScriptInfo!['version'],
-        if ((currentScriptInfo?['author'] ?? '').toString().isNotEmpty)
-          'author': currentScriptInfo!['author'],
-        if ((currentScriptInfo?['homepage'] ?? '').toString().isNotEmpty)
-          'homepage': currentScriptInfo!['homepage'],
-      });
+    final safeHeader = <String, dynamic>{
+      if ((currentScriptInfo?['name'] ?? '').toString().isNotEmpty)
+        'name': currentScriptInfo!['name'],
+      if ((currentScriptInfo?['description'] ?? '').toString().isNotEmpty)
+        'description': currentScriptInfo!['description'],
+      if ((currentScriptInfo?['version'] ?? '').toString().isNotEmpty)
+        'version': currentScriptInfo!['version'],
+      if ((currentScriptInfo?['author'] ?? '').toString().isNotEmpty)
+        'author': currentScriptInfo!['author'],
+      if ((currentScriptInfo?['homepage'] ?? '').toString().isNotEmpty)
+        'homepage': currentScriptInfo!['homepage'],
+      if ((currentScriptInfo?['sourceUrl'] ?? '').toString().isNotEmpty)
+        'sourceUrl': currentScriptInfo!['sourceUrl'],
+    };
     final headerJson = jsonEncode(safeHeader);
 
     // 安装 lx 对象与事件系统（异步从 assets 加载）
@@ -206,12 +250,57 @@ class PluginEngine {
 
     _rt.evaluate(_emitRequestFunction, sourceUrl: 'emit_request.js');
 
+    // 先准备对 inited 事件的等待，再执行用户脚本
+    final Future<Map<String, dynamic>> initedFuture = events
+        .firstWhere((e) => e.name == 'inited')
+        .then((e) => e.data ?? <String, dynamic>{});
+
     // 执行用户脚本
     final res = await _rt.evaluateAsync(script, sourceUrl: sourceUrl);
     final handled = await _rt.handlePromise(res);
     if (handled.isError) {
       throw Exception('Plugin script error: ${handled.stringResult}');
     }
+    // 等待 inited 事件并返回其数据（增加超时与友好提示）
+    final Duration timeout = initTimeout ?? const Duration(seconds: 12);
+    final data = await initedFuture.timeout(
+      timeout,
+      onTimeout: () {
+        throw Exception(
+          '插件初始化超时：未在 ${timeout.inSeconds}s 内收到 inited 事件。\n'
+          '可能原因：\n'
+          '1) 插件在初始化阶段依赖的网络请求失败或被拦截（例如明文 HTTP 被系统限制）；\n'
+          '2) 插件脚本未调用 send(EVENT_NAMES.inited)；\n'
+          '3) 运行环境异常导致初始化逻辑未执行。\n'
+          '建议：\n'
+          '- 优先改用 HTTPS 接口；\n'
+          '- Android 可在 Manifest 中启用 usesCleartextTraffic 或配置 networkSecurityConfig 放行域名；\n'
+          '- iOS 可在 Info.plist 的 ATS 中为目标域名添加例外；\n'
+          '- 或检查脚本逻辑是否在初始化路径上调用了 inited。\n'
+          'source: $sourceUrl',
+        );
+      },
+    );
+    return data;
+  }
+
+  /// 便捷方法：调用插件中的 musicUrl 能力，返回歌曲 URL。
+  /// 当 source 为 local 时，可传入 type = null。
+  Future<String> getMusicUrl({
+    required String source,
+    String? type,
+    required Map<String, dynamic> musicInfo,
+  }) async {
+    final result = await request(
+      source: source,
+      action: 'musicUrl',
+      info: {'type': type, 'musicInfo': musicInfo},
+    );
+    if (result is String) return result;
+    if (result is Map && result['url'] is String) {
+      return result['url'] as String;
+    }
+    return result?.toString() ?? '';
   }
 
   // AES(CBC/ECB + PKCS7) 加密，输入数据 base64，输出 base64
@@ -274,27 +363,44 @@ class PluginEngine {
 
   /// 获取脚本头部信息
   Map<String, dynamic> _parseHeaderComment(String script) {
-    // 匹配 /** ... */ 或 /*! ... */ 里的 @tag 值
-    RegExp reg1 = RegExp(r"/\*\*([\s\S]*?)\*/");
-    RegExp reg2 = RegExp(r"/\*!([\s\S]*?)\*/");
-    final match = reg1.firstMatch(script) ?? reg2.firstMatch(script);
-    final raw = match?.group(1) ?? '';
-    String pick(String key) {
-      final r = RegExp(
-        '@$key'
-        r"\s+([^\n\r]+)",
-      );
-      final m = r.firstMatch(raw);
-      return (m?.group(1) ?? '').trim();
+    // 匹配 /** ... */ 或 /*! ... */，取最可能的头部注释
+    final regBlockA = RegExp(r"/\*\*([\s\S]*?)\*/");
+    final regBlockB = RegExp(r"/\*!([\s\S]*?)\*/");
+    RegExpMatch? match;
+    // 优先选择包含 @name 的注释块
+    final allMatches = <RegExpMatch>[
+      ...regBlockB.allMatches(script),
+      ...regBlockA.allMatches(script),
+    ];
+    for (final m in allMatches) {
+      final inner = m.group(1) ?? '';
+      if (inner.contains('@name')) {
+        match = m;
+        break;
+      }
+    }
+    match ??= regBlockB.firstMatch(script) ?? regBlockA.firstMatch(script);
+    final innerRaw = match?.group(1) ?? '';
+
+    // 逐行清洗前导 "*" 与空白，然后解析 @key value
+    final Map<String, String> tags = {};
+    for (final line in innerRaw.split(RegExp(r"\r?\n"))) {
+      final cleaned = line.replaceFirst(RegExp(r"^\s*\*\s?"), '');
+      final m = RegExp(r"^@(\w+)\s+(.+)").firstMatch(cleaned);
+      if (m != null) {
+        final k = (m.group(1) ?? '').toLowerCase().trim();
+        final v = (m.group(2) ?? '').trim();
+        if (k.isNotEmpty) tags[k] = v;
+      }
     }
 
-    final name = pick('name');
-    final description = pick('description');
-    final version = pick('version');
-    final author = pick('author');
-    final homepage = pick('homepage').isNotEmpty
-        ? pick('homepage')
-        : pick('repository');
+    final name = tags['name'] ?? '';
+    final description = tags['description'] ?? '';
+    final version = tags['version'] ?? '';
+    final author = tags['author'] ?? '';
+    final homepage = (tags['homepage'] ?? '').isNotEmpty
+        ? (tags['homepage'] ?? '')
+        : (tags['repository'] ?? '');
 
     return {
       'name': name,
