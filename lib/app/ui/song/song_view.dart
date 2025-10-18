@@ -180,11 +180,7 @@ class _PlayerPanel extends StatelessWidget {
               tooltip: '下一曲',
               onPressed: () => p.next(),
             ),
-            IconButton(
-              icon: const Icon(Icons.shuffle),
-              tooltip: '随机播放',
-              onPressed: () => p.randomPlay(),
-            ),
+
             IconButton(
               icon: const Icon(Icons.queue_music),
               tooltip: '查看播放列表',
