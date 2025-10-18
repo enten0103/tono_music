@@ -7,7 +7,7 @@ import 'package:flutter_js/extensions/fetch.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:encrypt/encrypt.dart' as enc;
 
-/// JS 插件引擎：基于 flutter_js，把 music_souce.md 约定的 globalThis.lx 注入到 JS 运行时中。
+/// JS 插件引擎：基于 flutter_js 将，globalThis.lx 注入到 JS 运行时中。
 ///
 /// 主要能力：
 /// - 解析脚本头部注释，得到 @name/@description/@version/@author/@homepage
