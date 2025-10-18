@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'playlist_detail_controller.dart';
+import '../../widgets/desktop_title_bar.dart';
 
 class PlaylistDetailView extends GetView<PlaylistDetailController> {
   const PlaylistDetailView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final title = controller.title.isEmpty ? '歌单' : controller.title.value;
     return Scaffold(
-      appBar: AppBar(
-        title: Obx(
-          () => Text(controller.title.isEmpty ? '歌单' : controller.title.value),
-        ),
+      appBar: DesktopTitleBar(title: title),
+      floatingActionButton: FloatingActionButton.small(
+        onPressed: () => Get.back<void>(),
+        tooltip: '返回',
+        child: const Icon(Icons.arrow_back),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       body: Obx(() {
         if (controller.loading.value) {
           return const Center(child: CircularProgressIndicator());

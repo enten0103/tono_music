@@ -5,6 +5,7 @@ import '../square/square_view.dart';
 import '../search/search_view.dart';
 import '../favorite/favorite_view.dart';
 import '../settings/settings_view.dart';
+import '../../widgets/desktop_title_bar.dart';
 
 class RootView extends GetView<RootController> {
   const RootView({super.key});
@@ -26,7 +27,7 @@ class RootView extends GetView<RootController> {
       if (isWide) {
         // 宽屏：侧边导航
         return Scaffold(
-          appBar: AppBar(title: const Text('TonoMusic')),
+          appBar: const DesktopTitleBar(title: 'TonoMusic'),
           body: Row(
             children: [
               NavigationRail(
@@ -64,7 +65,7 @@ class RootView extends GetView<RootController> {
       } else {
         // 窄屏：底部导航
         return Scaffold(
-          appBar: AppBar(title: const Text('TonoMusic')),
+          appBar: const DesktopTitleBar(title: 'TonoMusic'),
           body: content,
           bottomNavigationBar: NavigationBar(
             selectedIndex: idx,
