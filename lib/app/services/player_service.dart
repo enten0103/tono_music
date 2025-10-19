@@ -51,6 +51,7 @@ class PlayerService extends GetxService {
       playing.value = s.playing;
       if (s.processingState == ProcessingState.completed) {
         if (queue.isNotEmpty && loopList.value) {
+          Get.log('自动播放下一首');
           await next();
         } else {
           await _player.stop();
@@ -163,11 +164,11 @@ class PlayerService extends GetxService {
     );
     if (startIdx < 0) return;
     // 队列顺序始终与歌单一致，仅旋转到点击项为首
-    final ordered = [...items.sublist(startIdx), ...items.sublist(0, startIdx)];
+    final ordered = [...items];
     queue.assignAll(ordered);
     currentIndex.value = 0;
     loopList.value = true; // 默认顺序循环
-    await _playByIndex(0, manual: true);
+    await _playByIndex(startIdx);
   }
 
   Future<void> randomPlay() async {
@@ -175,15 +176,13 @@ class PlayerService extends GetxService {
     final idx = (queue.length > 1)
         ? (DateTime.now().millisecondsSinceEpoch % queue.length)
         : 0;
-    currentIndex.value = idx;
-    await _playByIndex(idx, manual: true);
+    await _playByIndex(idx);
   }
 
   Future<void> previous() async {
     if (queue.isEmpty) return;
     final idx = currentIndex.value;
     final nextIdx = (idx - 1 + queue.length) % queue.length;
-    currentIndex.value = nextIdx;
     await _playByIndex(nextIdx);
   }
 
@@ -191,21 +190,19 @@ class PlayerService extends GetxService {
     if (queue.isEmpty) return;
     final idx = currentIndex.value;
     final nextIdx = (idx + 1) % queue.length;
-    currentIndex.value = nextIdx;
     await _playByIndex(nextIdx);
   }
 
   Future<void> playAt(int idx) async {
     if (queue.isEmpty) return;
     if (idx < 0 || idx >= queue.length) return;
-    currentIndex.value = idx;
-    await _playByIndex(idx, manual: true);
+    await _playByIndex(idx);
   }
 
   //防抖
   bool _nextLock = false;
 
-  Future<void> _playByIndex(int idx, {bool manual = false}) async {
+  Future<void> _playByIndex(int idx) async {
     if (_nextLock) return;
     _nextLock = true;
     Timer(const Duration(milliseconds: 500), () {
@@ -217,6 +214,7 @@ class PlayerService extends GetxService {
     await pause();
     await seek(Duration.zero);
 
+    currentIndex.value = idx;
     setMetadata(
       title: item.name,
       cover: item.coverUrl,
