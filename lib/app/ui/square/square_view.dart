@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'square_controller.dart';
 import '../../routes/app_routes.dart';
+import '../root/root_controller.dart';
+import 'package:flutter/rendering.dart';
 
 class SquareView extends GetView<SquareController> {
   const SquareView({super.key});
@@ -80,10 +82,20 @@ class SquareView extends GetView<SquareController> {
             onRefresh: controller.refresh,
             child: NotificationListener<ScrollNotification>(
               onNotification: (n) {
+                // 如果滚动停止并已到底部，加载更多
                 if (n is ScrollEndNotification) {
                   final m = n.metrics;
                   if (m.pixels >= m.maxScrollExtent - 100) {
                     controller.loadMore();
+                  }
+                }
+                // 检测滚动方向，向上隐藏顶部/底部，向下显示
+                if (n is UserScrollNotification) {
+                  final root = Get.find<RootController>();
+                  if (n.direction == ScrollDirection.reverse) {
+                    root.setShowBars(false);
+                  } else if (n.direction == ScrollDirection.forward) {
+                    root.setShowBars(true);
                   }
                 }
                 return false;
@@ -95,8 +107,8 @@ class SquareView extends GetView<SquareController> {
                     sliver: SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
                         childAspectRatio: 0.72,
                       ),
                       delegate: SliverChildBuilderDelegate((context, i) {

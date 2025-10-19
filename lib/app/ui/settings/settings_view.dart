@@ -56,27 +56,7 @@ class SettingsView extends GetView<SettingsController> {
             onChangeEnd: (nv) => controller.setImageCacheMB(nv.round()),
           );
         }),
-        Row(
-          children: [
-            ElevatedButton.icon(
-              onPressed: () => controller.setImageCacheMB(128),
-              icon: const Icon(Icons.tune),
-              label: const Text('设为 128MB'),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: () => controller.setImageCacheMB(256),
-              icon: const Icon(Icons.tune),
-              label: const Text('设为 256MB'),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: () => controller.setImageCacheMB(512),
-              icon: const Icon(Icons.tune),
-              label: const Text('设为 512MB'),
-            ),
-          ],
-        ),
+
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: controller.clearImageCache,

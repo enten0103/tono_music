@@ -16,6 +16,7 @@ class RootView extends GetView<RootController> {
     return Obx(() {
       final idx = controller.index.value;
       final isWide = MediaQuery.of(context).size.width >= 900;
+      final showBars = controller.showBars.value;
 
       final pages = const <Widget>[
         SquareView(),
@@ -28,7 +29,7 @@ class RootView extends GetView<RootController> {
       if (isWide) {
         // 宽屏：侧边导航
         return Scaffold(
-          appBar: const DesktopTitleBar(title: 'TonoMusic'),
+          appBar: showBars ? const DesktopTitleBar(title: 'TonoMusic') : null,
           body: Column(
             children: [
               Expanded(
@@ -74,39 +75,46 @@ class RootView extends GetView<RootController> {
       } else {
         // 窄屏：底部导航
         return Scaffold(
-          appBar: const DesktopTitleBar(title: 'TonoMusic'),
+          appBar: showBars ? const DesktopTitleBar(title: 'TonoMusic') : null,
           body: content,
-          bottomNavigationBar: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const _RootMiniPlayerSlot(),
-              NavigationBar(
-                selectedIndex: idx,
-                onDestinationSelected: controller.setIndex,
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.apps_outlined),
-                    selectedIcon: Icon(Icons.apps),
-                    label: '广场',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.search_outlined),
-                    selectedIcon: Icon(Icons.search),
-                    label: '搜索',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.favorite_border),
-                    selectedIcon: Icon(Icons.favorite),
-                    label: '收藏',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings),
-                    label: '设置',
+          bottomNavigationBar: AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: SizedBox(
+              height: showBars ? null : 0,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const _RootMiniPlayerSlot(),
+                  NavigationBar(
+                    selectedIndex: idx,
+                    onDestinationSelected: controller.setIndex,
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.apps_outlined),
+                        selectedIcon: Icon(Icons.apps),
+                        label: '广场',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.search_outlined),
+                        selectedIcon: Icon(Icons.search),
+                        label: '搜索',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.favorite_border),
+                        selectedIcon: Icon(Icons.favorite),
+                        label: '收藏',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.settings_outlined),
+                        selectedIcon: Icon(Icons.settings),
+                        label: '设置',
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         );
       }
