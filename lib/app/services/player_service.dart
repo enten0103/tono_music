@@ -49,6 +49,7 @@ class PlayerService extends GetxService {
     }
 
     _stateSub = _player.playerStateStream.listen((s) async {
+      playing.value = s.playing;
       if (_nextLock) return;
       if (s.processingState == ProcessingState.completed) {
         if (queue.isNotEmpty && loopList.value) {
@@ -61,8 +62,6 @@ class PlayerService extends GetxService {
           await _player.stop();
         }
       }
-
-      playing.value = s.playing;
     });
 
     _posSub = _player.positionStream.listen((d) {
@@ -187,20 +186,18 @@ class PlayerService extends GetxService {
   }
 
   Future<void> next() async {
-    if (_nextLock) return;
-    _nextLock = true;
-    Timer(const Duration(milliseconds: 500), () {
-      _nextLock = false;
-    });
     if (queue.isEmpty) return;
     final idx = currentIndex.value;
     final nextIdx = (idx + 1) % queue.length;
-    Get.log((idx.toString()) + nextIdx.toString());
     currentIndex.value = nextIdx;
     await _playByIndex(nextIdx);
   }
 
   Future<void> playAt(int idx) async {
+    _nextLock = true;
+    Timer(const Duration(milliseconds: 500), () {
+      _nextLock = false;
+    });
     if (queue.isEmpty) return;
     if (idx < 0 || idx >= queue.length) return;
     currentIndex.value = idx;
