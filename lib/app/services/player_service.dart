@@ -14,7 +14,6 @@ class PlayerService extends GetxService {
   final RxString error = ''.obs;
 
   //锁，避免连续的下一首
-  bool _nextLock = false;
 
   // 当前曲目信息
   final RxString currentTitle = ''.obs;
@@ -50,13 +49,8 @@ class PlayerService extends GetxService {
 
     _stateSub = _player.playerStateStream.listen((s) async {
       playing.value = s.playing;
-      if (_nextLock) return;
       if (s.processingState == ProcessingState.completed) {
         if (queue.isNotEmpty && loopList.value) {
-          _nextLock = true;
-          Timer(const Duration(milliseconds: 500), () {
-            _nextLock = false;
-          });
           await next();
         } else {
           await _player.stop();
@@ -194,20 +188,27 @@ class PlayerService extends GetxService {
   }
 
   Future<void> playAt(int idx) async {
-    _nextLock = true;
-    Timer(const Duration(milliseconds: 500), () {
-      _nextLock = false;
-    });
     if (queue.isEmpty) return;
     if (idx < 0 || idx >= queue.length) return;
     currentIndex.value = idx;
     await _playByIndex(idx, manual: true);
   }
 
+  //防抖
+  bool _nextLock = false;
+
   Future<void> _playByIndex(int idx, {bool manual = false}) async {
+    if (_nextLock) return;
+    _nextLock = true;
+    Timer(const Duration(milliseconds: 500), () {
+      _nextLock = false;
+    });
     if (idx < 0 || idx >= queue.length) return;
     final item = queue[idx];
     // 设置元数据
+    await pause();
+    await seek(Duration.zero);
+
     setMetadata(
       title: item.name,
       cover: item.coverUrl,
