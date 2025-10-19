@@ -13,8 +13,10 @@ class PlaylistDetailView extends GetView<PlaylistDetailController> {
     return Scaffold(
       appBar: AppBar(
         title: Obx(
-          () => Text(
-            controller.title.value.isEmpty ? '歌单' : controller.title.value,
+          () => DragToMoveArea(
+            child: Text(
+              controller.title.value.isEmpty ? '歌单' : controller.title.value,
+            ),
           ),
         ),
         flexibleSpace: const DragToMoveArea(child: SizedBox.expand()),

@@ -13,8 +13,11 @@ class SongView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Obx(
-          () =>
-              Text(p.currentTitle.value.isEmpty ? '歌曲' : p.currentTitle.value),
+          () => DragToMoveArea(
+            child: Text(
+              p.currentTitle.value.isEmpty ? '歌曲' : p.currentTitle.value,
+            ),
+          ),
         ),
         flexibleSpace: const DragToMoveArea(child: SizedBox.expand()),
       ),
