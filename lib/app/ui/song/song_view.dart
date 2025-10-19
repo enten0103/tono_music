@@ -157,63 +157,107 @@ class _LyricListState extends State<_LyricList>
   }
 }
 
-class _PlayerPanel extends StatelessWidget {
+class _PlayerPanel extends GetView<PlayerService> {
   @override
   Widget build(BuildContext context) {
-    final p = Get.find<PlayerService>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Obx(
-              () => IconButton(
-                icon: Icon(p.playing.value ? Icons.pause : Icons.play_arrow),
-                onPressed: () {
-                  if (p.playing.value) {
-                    p.pause();
-                  } else {
-                    p.play();
-                  }
-                },
+            Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: const Icon(Icons.favorite_outline),
+                tooltip: '收藏',
+                onPressed: () {},
+                splashRadius: 24,
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.skip_next),
-              tooltip: '下一曲',
-              onPressed: () => p.next(),
-            ),
-
-            IconButton(
-              icon: const Icon(Icons.queue_music),
-              tooltip: '查看播放列表',
-              onPressed: () => showQueueSheet(context),
+            const SizedBox(width: 8),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                shape: const CircleBorder(),
+                padding: const EdgeInsets.all(0),
+                minimumSize: const Size(48, 48),
+              ),
+              onPressed: () => controller.previous(),
+              child: const Icon(Icons.skip_previous),
             ),
             const SizedBox(width: 8),
+            Obx(
+              () => FilledButton(
+                style: FilledButton.styleFrom(
+                  shape: const CircleBorder(),
+                  padding: const EdgeInsets.all(0),
+                  minimumSize: const Size(56, 56),
+                ),
+                onPressed: () {
+                  if (controller.playing.value) {
+                    controller.pause();
+                  } else {
+                    controller.play();
+                  }
+                },
+                child: Icon(
+                  controller.playing.value ? Icons.pause : Icons.play_arrow,
+                  size: 32,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                shape: const CircleBorder(),
+                padding: const EdgeInsets.all(0),
+                minimumSize: const Size(48, 48),
+              ),
+              onPressed: () => controller.next(),
+              child: const Icon(Icons.skip_next),
+            ),
+            const SizedBox(width: 8),
+            Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: const Icon(Icons.queue_music),
+                tooltip: '查看播放列表',
+                onPressed: () => showQueueSheet(context),
+                splashRadius: 24,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
         Obx(() {
-          final pos = p.position.value;
-          final dur = p.duration.value ?? Duration.zero;
-          final buf = p.buffered.value;
+          final pos = controller.position.value;
+          final dur = controller.duration.value ?? Duration.zero;
           final total = dur.inMilliseconds.clamp(1, 1 << 62);
           final v = pos.inMilliseconds / total;
-          final b = buf.inMilliseconds / total;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              LinearProgressIndicator(value: b, minHeight: 2),
-              Slider(
-                value: v.clamp(0.0, 1.0),
-                onChanged: (nv) {
-                  final ms = (nv * total).toInt();
-                  p.seek(Duration(milliseconds: ms));
-                },
-              ),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [Text(_fmt(pos)), Text(_fmt(dur))],
+                children: [
+                  SizedBox(
+                    width: 42,
+                    child: Text(_fmt(pos), textAlign: TextAlign.left),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: v.clamp(0.0, 1.0),
+                      onChanged: (nv) {
+                        final ms = (nv * total).toInt();
+                        controller.seek(Duration(milliseconds: ms));
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 42,
+                    child: Text(_fmt(dur), textAlign: TextAlign.right),
+                  ),
+                ],
               ),
             ],
           );

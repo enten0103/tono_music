@@ -179,6 +179,14 @@ class PlayerService extends GetxService {
     await _playByIndex(idx, manual: true);
   }
 
+  Future<void> previous() async {
+    if (queue.isEmpty) return;
+    final idx = currentIndex.value;
+    final nextIdx = (idx - 1 + queue.length) % queue.length;
+    currentIndex.value = nextIdx;
+    await _playByIndex(nextIdx);
+  }
+
   Future<void> next() async {
     if (queue.isEmpty) return;
     final idx = currentIndex.value;
