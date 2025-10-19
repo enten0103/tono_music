@@ -1,9 +1,10 @@
 import 'dart:io';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tono_music/app/services/log_service.dart';
+import 'package:tono_music/app/services/notification_service.dart';
 import 'package:tono_music/app/services/player_service.dart';
 import 'package:tono_music/app/services/plugin_service.dart';
 import 'package:window_manager/window_manager.dart';
@@ -18,10 +19,16 @@ Future<void> bootstrap() async {
 Future<void> initDependencies() async {
   final logService = await LogService().init();
   Get.put<LogService>(logService);
+
   final playerService = await PlayerService().init();
-  final pluginService = await PluginService().init();
   Get.put<PlayerService>(playerService);
+
+  final pluginService = await PluginService().init();
   Get.put<PluginService>(pluginService);
+  if (Platform.isAndroid) {
+    final notificationService = await NotificationService().init();
+    Get.put<NotificationService>(notificationService);
+  }
 }
 
 Future<void> initImageCache() async {

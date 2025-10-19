@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tono_music/app/services/notification_service.dart';
 import '../../routes/app_routes.dart';
 import 'settings_controller.dart';
 
@@ -62,6 +63,15 @@ class SettingsView extends GetView<SettingsController> {
           onPressed: controller.clearImageCache,
           icon: const Icon(Icons.cleaning_services_outlined),
           label: const Text('清理图片缓存（内存）'),
+        ),
+
+        const Divider(),
+        OutlinedButton.icon(
+          onPressed: () {
+            Get.find<NotificationService>().checkAndRequestPermission();
+          },
+          icon: const Icon(Icons.notifications_on),
+          label: const Text('通知授权'),
         ),
         const Divider(),
         ListTile(
