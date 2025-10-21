@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:music_sdk/music_sdk.dart';
 import 'plugin_service.dart';
 
+@pragma("vm:entry-point")
 class PlayerService extends GetxService {
   final AudioPlayer _player = AudioPlayer();
   final RxBool playing = false.obs;
@@ -12,8 +13,6 @@ class PlayerService extends GetxService {
   final Rx<Duration> buffered = Duration.zero.obs;
   final Rx<Duration?> duration = Rx<Duration?>(null);
   final RxString error = ''.obs;
-
-  //锁，避免连续的下一首
 
   // 当前曲目信息
   final RxString currentTitle = ''.obs;

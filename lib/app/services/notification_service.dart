@@ -19,37 +19,42 @@ class NotificationService extends GetxService {
       content: NotificationContent(
         id: 1,
         channelKey: 'music_channel',
+        notificationLayout: NotificationLayout.MediaPlayer,
         title: playerService.currentTitle.value,
         body: "🎵 ${playerService.currentLyricLine.value}",
-        actionType: ActionType.SilentBackgroundAction,
+        actionType: ActionType.SilentAction,
         autoDismissible: false,
         showWhen: false,
       ),
       actionButtons: [
         NotificationActionButton(
-          actionType: ActionType.SilentBackgroundAction,
+          actionType: ActionType.SilentAction,
           key: 'prev',
           label: '上一曲',
           autoDismissible: false,
+          showInCompactView: true,
         ),
         !playerService.playing.value
             ? NotificationActionButton(
                 key: 'play',
                 label: '播放',
-                actionType: ActionType.SilentBackgroundAction,
+                actionType: ActionType.SilentAction,
                 autoDismissible: false,
+                showInCompactView: true,
               )
             : NotificationActionButton(
                 key: 'pause',
                 label: '暂停',
-                actionType: ActionType.SilentBackgroundAction,
+                actionType: ActionType.SilentAction,
                 autoDismissible: false,
+                showInCompactView: true,
               ),
         NotificationActionButton(
           key: 'next',
           label: '下一曲',
-          actionType: ActionType.SilentBackgroundAction,
+          actionType: ActionType.SilentAction,
           autoDismissible: false,
+          showInCompactView: true,
         ),
       ],
     );
@@ -65,7 +70,7 @@ class NotificationService extends GetxService {
           channelDescription: '用于音乐播放控制的通知栏',
           defaultColor: Color(0xFF2196F3),
           ledColor: Colors.white,
-          importance: NotificationImportance.Low,
+          importance: NotificationImportance.Default,
           playSound: false,
           soundSource: null,
           enableVibration: false,
