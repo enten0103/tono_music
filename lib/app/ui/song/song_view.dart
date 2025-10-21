@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tono_music/app/ui/song/lyric_list.dart';
+import 'package:tono_music/app/ui/song/player_panel.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../services/player_service.dart';
-import '../../widgets/queue_sheet.dart';
 
-class SongView extends StatelessWidget {
+class SongView extends GetView<PlayerService> {
   const SongView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final p = Get.find<PlayerService>();
     return Scaffold(
       appBar: AppBar(
         title: Obx(
           () => DragToMoveArea(
             child: Text(
-              p.currentTitle.value.isEmpty ? '歌曲' : p.currentTitle.value,
+              controller.currentTitle.value.isEmpty
+                  ? '歌曲'
+                  : controller.currentTitle.value,
             ),
           ),
         ),
@@ -27,7 +29,7 @@ class SongView extends StatelessWidget {
         Widget coverPane({double size = 220}) => ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.network(
-            p.currentCover.value,
+            controller.currentCover.value,
             width: size,
             height: size,
             fit: BoxFit.cover,
@@ -38,7 +40,7 @@ class SongView extends StatelessWidget {
             ),
           ),
         );
-        Widget lyricPane() => _LyricList();
+        Widget lyricPane() => LyricList();
         Widget topArea;
         if (isWide) {
           topArea = Row(
@@ -75,200 +77,11 @@ class SongView extends StatelessWidget {
             children: [
               Expanded(child: topArea),
               const SizedBox(height: 12),
-              // 错误与加载状态由 PlayerService 控制（可扩展）
-              // 下半区（播放进度控制）
-              _PlayerPanel(),
+              PlayerPanel(),
             ],
           ),
         );
       }),
     );
-  }
-}
-
-class _LyricList extends StatefulWidget {
-  @override
-  State<_LyricList> createState() => _LyricListState();
-}
-
-class _LyricListState extends State<_LyricList>
-    with AutomaticKeepAliveClientMixin {
-  final _scrollController = ScrollController();
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final p = Get.find<PlayerService>();
-    return Obx(() {
-      final itemCount = p.lyrics.length;
-      final cur = p.currentLyricIndex.value;
-      if (itemCount == 0) {
-        return const Center(child: Text('暂无歌词'));
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_scrollController.hasClients) return;
-        if (cur < 0) return;
-        const itemExtent = 36.0;
-        final target = (cur * itemExtent) - 120;
-        final clamped = target.clamp(
-          _scrollController.position.minScrollExtent,
-          _scrollController.position.maxScrollExtent,
-        );
-        _scrollController.animateTo(
-          clamped.toDouble(),
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
-      });
-      return ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        itemCount: itemCount,
-        itemBuilder: (_, i) {
-          final text = p.lyrics[i].text;
-          final active = i == cur;
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              text,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: active ? 20 : 16,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                color: active
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).textTheme.bodyMedium?.color,
-              ),
-            ),
-          );
-        },
-      );
-    });
-  }
-}
-
-class _PlayerPanel extends GetView<PlayerService> {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Material(
-              color: Colors.transparent,
-              child: IconButton(
-                icon: const Icon(Icons.favorite_outline),
-                tooltip: '收藏',
-                onPressed: () {},
-                splashRadius: 24,
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                shape: const CircleBorder(),
-                padding: const EdgeInsets.all(0),
-                minimumSize: const Size(48, 48),
-              ),
-              onPressed: () => controller.previous(),
-              child: const Icon(Icons.skip_previous),
-            ),
-            const SizedBox(width: 8),
-            Obx(
-              () => FilledButton(
-                style: FilledButton.styleFrom(
-                  shape: const CircleBorder(),
-                  padding: const EdgeInsets.all(0),
-                  minimumSize: const Size(56, 56),
-                ),
-                onPressed: () {
-                  if (controller.playing.value) {
-                    controller.pause();
-                  } else {
-                    controller.play();
-                  }
-                },
-                child: Icon(
-                  controller.playing.value ? Icons.pause : Icons.play_arrow,
-                  size: 32,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                shape: const CircleBorder(),
-                padding: const EdgeInsets.all(0),
-                minimumSize: const Size(48, 48),
-              ),
-              onPressed: () => controller.next(),
-              child: const Icon(Icons.skip_next),
-            ),
-            const SizedBox(width: 8),
-            Material(
-              color: Colors.transparent,
-              child: IconButton(
-                icon: const Icon(Icons.queue_music),
-                tooltip: '查看播放列表',
-                onPressed: () => showQueueSheet(context),
-                splashRadius: 24,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Obx(() {
-          final pos = controller.position.value;
-          final dur = controller.duration.value ?? Duration.zero;
-          final total = dur.inMilliseconds.clamp(1, 1 << 62);
-          final v = pos.inMilliseconds / total;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  SizedBox(
-                    width: 42,
-                    child: Text(_fmt(pos), textAlign: TextAlign.left),
-                  ),
-                  Expanded(
-                    child: Slider(
-                      value: v.clamp(0.0, 1.0),
-                      onChanged: (nv) {
-                        final ms = (nv * total).toInt();
-                        controller.seek(Duration(milliseconds: ms));
-                      },
-                    ),
-                  ),
-                  SizedBox(
-                    width: 42,
-                    child: Text(_fmt(dur), textAlign: TextAlign.right),
-                  ),
-                ],
-              ),
-            ],
-          );
-        }),
-      ],
-    );
-  }
-
-  String _fmt(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
   }
 }
