@@ -15,7 +15,7 @@ class SquareView extends GetView<SquareController> {
     return Obx(() {
       final loading = controller.loading.value;
       final error = controller.error.value;
-      final items = controller.playlists;
+      final playlists = controller.playlists;
 
       Widget buildControls() {
         return Row(
@@ -53,7 +53,7 @@ class SquareView extends GetView<SquareController> {
         if (error.isNotEmpty) {
           return Expanded(child: Center(child: Text('加载失败：$error')));
         }
-        if (items.isEmpty) {
+        if (playlists.isEmpty) {
           return const Expanded(child: Center(child: Text('暂无歌单')));
         }
         final width = MediaQuery.of(context).size.width;
@@ -102,16 +102,16 @@ class SquareView extends GetView<SquareController> {
                         childAspectRatio: 0.72,
                       ),
                       delegate: SliverChildBuilderDelegate((context, i) {
-                        final p = items[i];
+                        final playlist = playlists[i];
                         return PlaylistCard(
-                          id: p.id,
-                          source: p.source.name,
-                          name: p.name,
-                          coverUrl: p.coverUrl,
-                          creator: p.creator,
-                          playCount: p.playCount,
+                          id: playlist.id,
+                          source: playlist.source.name,
+                          name: playlist.name,
+                          coverUrl: playlist.coverUrl,
+                          creator: playlist.creator,
+                          playCount: playlist.playCount,
                         );
-                      }, childCount: items.length),
+                      }, childCount: playlists.length),
                     ),
                   ),
                   SliverToBoxAdapter(

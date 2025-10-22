@@ -30,8 +30,8 @@ class PlaylistDetailView extends GetView<PlaylistDetailController> {
             if (controller.error.isNotEmpty) {
               return Center(child: Text('加载失败：${controller.error}'));
             }
-            final list = controller.tracks;
-            if (list.isEmpty) {
+            final tracks = controller.tracks;
+            if (tracks.isEmpty) {
               return const Center(child: Text('暂无曲目'));
             }
             return Padding(
@@ -42,56 +42,61 @@ class PlaylistDetailView extends GetView<PlaylistDetailController> {
                     child: RefreshIndicator(
                       onRefresh: controller.refresh,
                       child: ListView.separated(
-                        itemCount: list.length,
+                        itemCount: tracks.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (_, i) {
-                          final s = list[i];
-                          return ListTile(
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: Image.network(
-                                s.picUrl,
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const SizedBox(
+                          final song = tracks[i];
+                          return Padding(
+                            padding: i == tracks.length - 1
+                                ? const EdgeInsets.only(bottom: 64)
+                                : const EdgeInsets.only(bottom: 0),
+                            child: ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.network(
+                                  song.picUrl,
                                   width: 48,
                                   height: 48,
-                                  child: ColoredBox(color: Color(0xFFEFEFEF)),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const SizedBox(
+                                    width: 48,
+                                    height: 48,
+                                    child: ColoredBox(color: Color(0xFFEFEFEF)),
+                                  ),
                                 ),
                               ),
+                              title: Text(
+                                song.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                song.artists.join('/'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: Text(_fmtDuration(song.duration)),
+                              onTap: () async {
+                                final p = Get.find<PlayerService>();
+                                final items = tracks
+                                    .map(
+                                      (e) => PlayItem(
+                                        id: e.id,
+                                        source: controller.source,
+                                        name: e.name,
+                                        coverUrl: e.picUrl,
+                                        duration: e.duration,
+                                        artists: e.artists,
+                                      ),
+                                    )
+                                    .toList();
+                                await p.setQueueFromPlaylist(
+                                  items,
+                                  startId: song.id,
+                                  startSource: controller.source,
+                                );
+                              },
                             ),
-                            title: Text(
-                              s.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              s.artists.join('/'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: Text(_fmtDuration(s.duration)),
-                            onTap: () async {
-                              final p = Get.find<PlayerService>();
-                              final items = list
-                                  .map(
-                                    (e) => PlayItem(
-                                      id: e.id,
-                                      source: controller.source,
-                                      name: e.name,
-                                      coverUrl: e.picUrl,
-                                      duration: e.duration,
-                                      artists: e.artists,
-                                    ),
-                                  )
-                                  .toList();
-                              await p.setQueueFromPlaylist(
-                                items,
-                                startId: s.id,
-                                startSource: controller.source,
-                              );
-                            },
                           );
                         },
                       ),

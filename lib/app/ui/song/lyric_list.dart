@@ -25,10 +25,10 @@ class _LyricListState extends State<LyricList>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final p = Get.find<PlayerService>();
+    final playerService = Get.find<PlayerService>();
     return Obx(() {
-      final itemCount = p.lyrics.length;
-      final cur = p.currentLyricIndex.value;
+      final itemCount = playerService.lyrics.length;
+      final cur = playerService.currentLyricIndex.value;
       if (itemCount == 0) {
         return const Center(child: Text('暂无歌词'));
       }
@@ -52,7 +52,7 @@ class _LyricListState extends State<LyricList>
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         itemCount: itemCount,
         itemBuilder: (_, i) {
-          final text = p.lyrics[i].text;
+          final text = playerService.lyrics[i].text;
           final active = i == cur;
           return AnimatedContainer(
             duration: const Duration(milliseconds: 150),

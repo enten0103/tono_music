@@ -23,9 +23,6 @@ class SquareController extends GetxController {
     switch (src) {
       case 'tx':
         return MusicClient.tx();
-      case 'kg':
-        // kg 暂不支持广场；回退到 wy
-        return MusicClient.wy();
       case 'wy':
       default:
         return MusicClient.wy();
