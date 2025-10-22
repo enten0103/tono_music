@@ -52,7 +52,13 @@ class SearchView extends GetView<SearchPageController> {
                   return ListTile(
                     leading: Padding(padding: EdgeInsets.only(left: 12)),
                     title: Text(items[i]),
-                    onTap: () {},
+                    onTap: () {
+                      Get.toNamed(
+                        items[i].endsWith("歌单")
+                            ? '/search/playlist?keyword=${keyword.value}'
+                            : '/search/song?keyword=${keyword.value}',
+                      );
+                    },
                   );
                 },
               );

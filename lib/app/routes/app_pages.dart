@@ -1,4 +1,8 @@
 import 'package:get/get.dart';
+import 'package:tono_music/app/ui/search/search_playlist/search_playlist_binding.dart';
+import 'package:tono_music/app/ui/search/search_playlist/search_playlist_view.dart';
+import 'package:tono_music/app/ui/search/search_song/search_song_binding.dart';
+import 'package:tono_music/app/ui/search/search_song/search_song_view.dart';
 import '../ui/root/root_binding.dart';
 import '../ui/root/root_view.dart';
 import 'app_routes.dart';
@@ -40,6 +44,16 @@ class AppPages {
       name: AppRoutes.song,
       page: () => const SongView(),
       transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRoutes.searchSong,
+      page: () => const SearchSongView(),
+      binding: SearchSongBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.searchPlaylist,
+      page: () => const SearchPlaylistView(),
+      binding: SearchPlaylistBinding(),
     ),
   ];
 }
