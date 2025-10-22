@@ -1,9 +1,10 @@
 import 'package:get/get.dart';
 import 'package:music_sdk/music_sdk.dart';
+import 'package:tono_music/app/ui/root/root_controller.dart';
 
 class SquareController extends GetxController {
   // 选用数据源：wy/tx（kg 暂不支持广场，fallback 到 wy）
-  final RxString source = 'wy'.obs;
+  final RxString source = Get.find<RootController>().source;
   final RxBool loading = false.obs;
   final RxString error = ''.obs;
 
@@ -34,6 +35,12 @@ class SquareController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    ever(source, (cb) {
+      // 切换来源后重载（刷新标签与歌单）
+      hotTags.clear();
+      selectedTag.value = TagCommon(id: '', name: '全部');
+      loadSquare(initial: true);
+    });
     loadSquare(initial: true);
   }
 

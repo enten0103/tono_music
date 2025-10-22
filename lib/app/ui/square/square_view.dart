@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/app/widgets/play_list_card.dart';
@@ -14,23 +16,10 @@ class SquareView extends GetView<SquareController> {
       final loading = controller.loading.value;
       final error = controller.error.value;
       final items = controller.playlists;
-      final sources = const [
-        {'id': 'wy', 'name': '网易云'},
-        {'id': 'tx', 'name': 'QQ音乐'},
-      ];
 
       Widget buildControls() {
         return Row(
           children: [
-            DropdownButton<String>(
-              value: controller.source.value,
-              onChanged: (v) => v != null ? controller.setSource(v) : null,
-              items: [
-                for (final s in sources)
-                  DropdownMenuItem(value: s['id']!, child: Text(s['name']!)),
-              ],
-            ),
-            const SizedBox(width: 12),
             DropdownButton<String?>(
               value: controller.selectedTag.value?.id,
               hint: const Text('热门标签'),
@@ -92,7 +81,8 @@ class SquareView extends GetView<SquareController> {
                 // 检测滚动方向，向上隐藏顶部/底部，向下显示
                 if (n is UserScrollNotification) {
                   final root = Get.find<RootController>();
-                  if (n.direction == ScrollDirection.reverse) {
+                  if (n.direction == ScrollDirection.reverse &&
+                      (Platform.isAndroid || Platform.isIOS)) {
                     root.setShowBars(false);
                   } else if (n.direction == ScrollDirection.forward) {
                     root.setShowBars(true);

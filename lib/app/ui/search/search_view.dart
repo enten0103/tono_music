@@ -4,46 +4,59 @@ import 'search_controller.dart';
 
 class SearchView extends GetView<SearchPageController> {
   const SearchView({super.key});
-
+  final sources = const [
+    {'id': 'wy', 'name': '网易云'},
+    {'id': 'tx', 'name': 'QQ音乐'},
+  ];
   @override
   Widget build(BuildContext context) {
     final textController = TextEditingController();
+    final keyword = "".obs;
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
+              SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: textController,
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search),
-                    hintText: '搜索歌曲/歌手/专辑',
+                    hintText: '搜索歌曲/歌单',
                   ),
-                  onSubmitted: controller.onSearch,
+                  onChanged: (e) => keyword.value = e,
                 ),
               ),
               const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () => controller.onSearch(textController.text),
-                child: const Text('搜索'),
-              ),
             ],
           ),
           const SizedBox(height: 12),
+          // 搜索历史与结果区
           Expanded(
-            child: Obx(
-              () => ListView.separated(
-                itemBuilder: (_, i) => ListTile(
-                  leading: const Icon(Icons.audiotrack),
-                  title: Text(controller.results[i]),
-                  onTap: () {},
+            child: Obx(() {
+              final items = keyword.value != ""
+                  ? ["$keyword - 歌曲", "$keyword - 歌单"]
+                  : [];
+              return ListView.separated(
+                itemCount: items.length,
+                separatorBuilder: (_, __) => Padding(
+                  padding: EdgeInsets.only(left: 20, right: 20),
+                  child: Divider(height: 1),
                 ),
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemCount: controller.results.length,
-              ),
-            ),
+                itemBuilder: (_, i) {
+                  return ListTile(
+                    leading: Padding(padding: EdgeInsets.only(left: 12)),
+                    title: Text(items[i]),
+                    onTap: () {},
+                  );
+                },
+              );
+            }),
           ),
         ],
       ),

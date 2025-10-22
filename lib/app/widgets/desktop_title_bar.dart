@@ -1,6 +1,8 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:tono_music/app/ui/root/root_controller.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:get/get.dart';
 
 /// 桌面端自定义标题栏（Windows/macOS/Linux）
 /// - 隐藏系统标题栏后使用本组件替代
@@ -8,7 +10,6 @@ import 'package:window_manager/window_manager.dart';
 class DesktopTitleBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final double height;
-  final List<Widget>? actions;
   final bool showBack;
   final VoidCallback? onBack;
 
@@ -16,7 +17,6 @@ class DesktopTitleBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.title,
     this.height = 36,
-    this.actions,
     this.showBack = false,
     this.onBack,
   });
@@ -68,7 +68,6 @@ class DesktopTitleBar extends StatelessWidget implements PreferredSizeWidget {
                 style: theme.textTheme.titleSmall,
               ),
             ),
-            if (actions != null) ...[const SizedBox(width: 8), ...actions!],
           ],
         ),
       ),
@@ -124,7 +123,35 @@ class DesktopTitleBar extends StatelessWidget implements PreferredSizeWidget {
       return AppBar(
         leading: showBack ? _BackButton(onPressed: onBack) : null,
         title: Text(title),
-        actions: actions,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: SizedBox(
+              width: 100,
+              child: Obx(() {
+                final sc = Get.find<RootController>();
+                const sources = [
+                  {'id': 'wy', 'name': '网易云'},
+                  {'id': 'tx', 'name': 'QQ音乐'},
+                ];
+                return DropdownButton<String>(
+                  value: sc.source.value,
+                  onChanged: (v) => v != null ? sc.source.value = v : null,
+                  items: [
+                    for (final s in sources)
+                      DropdownMenuItem(
+                        value: s['id']!,
+                        child: Text(s['name']!),
+                      ),
+                  ],
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
       );
     }
 
@@ -143,6 +170,35 @@ class DesktopTitleBar extends StatelessWidget implements PreferredSizeWidget {
             // 拖拽区域需要让命中测试透传给 window_manager 的 hit-test
             // 这里使用一个透明的拖拽层：
             Expanded(child: moveArea),
+            // 如果 SquareController 已注册，则显示音源选择下拉
+            ...[
+              Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: SizedBox(
+                  width: 100,
+                  child: Obx(() {
+                    final sc = Get.find<RootController>();
+                    const sources = [
+                      {'id': 'wy', 'name': '网易云'},
+                      {'id': 'tx', 'name': 'QQ音乐'},
+                    ];
+                    return DropdownButton<String>(
+                      value: sc.source.value,
+                      onChanged: (v) => v != null ? sc.source.value = v : null,
+                      items: [
+                        for (final s in sources)
+                          DropdownMenuItem(
+                            value: s['id']!,
+                            child: Text(s['name']!),
+                          ),
+                      ],
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                    );
+                  }),
+                ),
+              ),
+            ],
             windowButtons(),
           ],
         ),

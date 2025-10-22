@@ -11,6 +11,17 @@ import 'package:window_manager/window_manager.dart';
 
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // // Debug: 监听原始键盘事件，打印事件与当前按下的物理键（仅在调试模式）
+  // if (kDebugMode) {
+  //   RawKeyboard.instance.addListener((RawKeyEvent e) {
+  //     try {
+  //       debugPrint('RawKeyEvent: $e');
+  //       debugPrint(
+  //         'Physical pressed keys: ${HardwareKeyboard.instance.physicalKeysPressed}',
+  //       );
+  //     } catch (_) {}
+  //   });
+  // }
   await initWindow();
   await initDependencies();
   await initImageCache();

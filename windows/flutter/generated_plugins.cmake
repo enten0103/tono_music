@@ -5,7 +5,6 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   awesome_notifications
   awesome_notifications_core
-  firebase_core
   flutter_js
   just_audio_windows
   screen_retriever_windows

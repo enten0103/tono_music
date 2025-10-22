@@ -9,4 +9,6 @@ class RootController extends GetxController {
   void setIndex(int i) => index.value = i;
 
   void setShowBars(bool v) => showBars.value = v;
+
+  RxString source = 'wy'.obs;
 }
