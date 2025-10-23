@@ -119,7 +119,9 @@ class PlayerService extends GetxService {
       return;
     }
     final ms = d.inMilliseconds;
-    int lo = 0, hi = lyrics.length - 1, ans = -1;
+    int lo = 0;
+    int hi = lyrics.length - 1;
+    int ans = -1;
     while (lo <= hi) {
       final mid = (lo + hi) >> 1;
       final v = lyrics[mid].ms;
@@ -132,7 +134,11 @@ class PlayerService extends GetxService {
     }
     if (ans != _lastLyricIndex && ans >= 0) {
       _lastLyricIndex = ans;
-      currentLyricLine.value = lyrics[ans].text;
+      final candidate = lyrics[ans].text;
+      // 如果候选歌词 trim 后为空，则保留旧的显示文本，但仍更新索引
+      if (candidate.trim().isNotEmpty) {
+        currentLyricLine.value = candidate;
+      }
       currentLyricIndex.value = ans;
     } else if (ans < 0) {
       currentLyricIndex.value = -1;

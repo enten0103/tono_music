@@ -52,8 +52,24 @@ class _LyricListState extends State<LyricList>
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         itemCount: itemCount,
         itemBuilder: (_, i) {
-          final text = playerService.lyrics[i].text;
+          final rawText = playerService.lyrics[i].text;
           final active = i == cur;
+          String text = rawText;
+          // 如果是激活行且当前行文本为空白，则使用 currentLyricLine（若有）或回溯上一条非空歌词
+          if (active && text.trim().isEmpty) {
+            if (playerService.currentLyricLine.value.trim().isNotEmpty) {
+              text = playerService.currentLyricLine.value;
+            } else {
+              // 回溯查找上一个非空歌词
+              for (int j = i - 1; j >= 0; j--) {
+                final prev = playerService.lyrics[j].text;
+                if (prev.trim().isNotEmpty) {
+                  text = prev;
+                  break;
+                }
+              }
+            }
+          }
           return AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(vertical: 8),
