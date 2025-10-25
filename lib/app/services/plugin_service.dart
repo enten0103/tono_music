@@ -41,7 +41,7 @@ class PluginService extends GetxService {
     await eng.reset();
     final script = await rootBundle.loadString(assetPath);
     final inited = await eng.loadScript(script, sourceUrl: assetPath);
-    var info = eng.getcurrentScriptInfo();
+    var info = eng.getCurrentScriptInfo();
     // 缓存脚本到本地并更新 sourceUrl
     final cached = await _cacheScriptToLocal(script: script, info: info);
     if (cached != null) {
@@ -95,7 +95,7 @@ class PluginService extends GetxService {
     if (eng == null) throw Exception('engine not ready');
     await eng.reset();
     final inited = await eng.loadScript(script, sourceUrl: sourceUrl);
-    var info = eng.getcurrentScriptInfo()..['sourceUrl'] = sourceUrl;
+    var info = eng.getCurrentScriptInfo()..['sourceUrl'] = sourceUrl;
     // 缓存脚本到本地并更新 sourceUrl
     final cached = await _cacheScriptToLocal(script: script, info: info);
     if (cached != null) {
@@ -131,7 +131,7 @@ class PluginService extends GetxService {
   Map<String, dynamic> getcurrentScriptInfo({bool includeRaw = false}) {
     final eng = engine;
     if (eng == null) return {};
-    return eng.getcurrentScriptInfo(includeRaw: includeRaw);
+    return eng.getCurrentScriptInfo(includeRaw: includeRaw);
   }
 
   void activate(int index) {
@@ -392,7 +392,7 @@ class PluginService extends GetxService {
     try {
       await eng.reset();
       final inited = await eng.loadScript(script, sourceUrl: sourceUrl);
-      currentScriptInfo.assignAll(eng.getcurrentScriptInfo());
+      currentScriptInfo.assignAll(eng.getCurrentScriptInfo());
       final payload = InitedPayload.fromJson(inited);
       _updateSelectionFromInited(payload);
     } catch (_) {

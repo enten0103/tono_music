@@ -15,6 +15,20 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
 - [ ] 完整插件运行时
 - [ ] 流式API
 
+插件运行时
+
+- [x] on
+- [x] send
+- [x] request
+- [x] uiils.buffer.from
+- [x] uiils.buffer.bufToString
+- [x] uiils.crypto.aesEncrypt
+- [x] uiils.crypto.md5
+- [x] uiils.crypto.randomBytes
+- [ ] uiils.crypto.rsaEncrypt
+- [ ] uiils.zlib.inflate
+- [ ] uiils.zlib.deflate
+
 功能
 
 - [x] 广场
@@ -32,6 +46,6 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
 
 # Q&A
 
-Q:为什么在LXmusic中可以正常工作的插件无法运行
-A:项目仍处在开发中，目前仅实现了最小的兼容
+Q:为什么在LXmusic中可以正常工作的插件无法运行  
+A:项目仍处在开发中，目前仅实现了最小的兼容。已知处于被混淆状态的脚本会出现严重的运行问题。
 
