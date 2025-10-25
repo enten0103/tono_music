@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_js/flutter_js.dart';
 import 'package:flutter_js/extensions/fetch.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:get/get.dart';
 
 /// JS 插件引擎：基于 flutter_js 将，globalThis.lx 注入到 JS 运行时中。
 ///
@@ -17,6 +18,11 @@ class PluginEngine {
   PluginEngine._();
 
   late JavascriptRuntime runtime;
+
+  // pending job loop 控制字段
+  bool _pendingLoopRunning = false;
+  bool _pendingLoopCancelRequested = false;
+  Timer? _pendingTimeoutTimer;
 
   Map<String, dynamic>? currentScriptInfo; // 解析的头部信息
   Map<String, dynamic>? initedPayload; // 脚本 inited 时上报的数据（sources、openDevTools）
@@ -52,13 +58,16 @@ class PluginEngine {
   }
 
   Future<void> _initRuntime() async {
-    runtime = getJavascriptRuntime();
+    runtime = getJavascriptRuntime(forceJavascriptCoreOnAndroid: true);
     runtime.enableHandlePromises();
     await runtime.enableFetch();
   }
 
   /// 重置运行时：用于在导入新脚本前清理环境，避免重复声明
   Future<void> reset() async {
+    try {
+      endPending();
+    } catch (_) {}
     try {
       runtime.dispose();
     } catch (_) {}
@@ -74,6 +83,7 @@ class PluginEngine {
     required String action,
     required Map<String, dynamic> info,
   }) async {
+    startPending();
     final argsJson = jsonEncode({
       'source': source,
       'action': action,
@@ -86,6 +96,7 @@ class PluginEngine {
       throw Exception('request error: ${handled.stringResult}');
     }
     final str = handled.stringResult;
+    endPending();
     try {
       return jsonDecode(str);
     } catch (_) {
@@ -95,8 +106,14 @@ class PluginEngine {
 
   /// 释放资源
   void dispose() {
+    // 停止 pending 循环并释放运行时
+    try {
+      endPending();
+    } catch (_) {}
     eventbus.close();
-    runtime.dispose();
+    try {
+      runtime.dispose();
+    } catch (_) {}
   }
 
   Future<Map<String, dynamic>> loadScript(
@@ -120,6 +137,7 @@ class PluginEngine {
       if ((currentScriptInfo?['sourceUrl'] ?? '').toString().isNotEmpty)
         'sourceUrl': currentScriptInfo!['sourceUrl'],
     };
+
     final headerJson = jsonEncode(safeHeader);
 
     // 安装crypto
@@ -137,11 +155,18 @@ class PluginEngine {
 
     // 执行用户脚本
     final res = await runtime.evaluateAsync(script, sourceUrl: sourceUrl);
+
     final handled = await runtime.handlePromise(res);
     if (handled.isError) {
       throw Exception('Plugin script error: ${handled.stringResult}');
     }
-    // 等待 inited 事件并返回其数据
+    for (var i = 0; i < 100; i++) {
+      runtime.executePendingJob();
+    }
+
+    startPending();
+
+    Get.log('Plugin initializing...');
     final Duration timeout = initTimeout ?? const Duration(seconds: 5);
     final data = await initedFuture.timeout(
       timeout,
@@ -152,6 +177,7 @@ class PluginEngine {
         );
       },
     );
+    endPending();
     return data;
   }
 
@@ -187,6 +213,70 @@ class PluginEngine {
     final tpl = await rootBundle.loadString('assets/lx_bridge.js');
     final js = tpl.replaceAll('__HEADER_JSON__', headerJson);
     runtime.evaluate(js, sourceUrl: 'lx_bridge.js');
+  }
+
+  /// 启动 pending job 循环。
+  /// pollInterval: 轮询间隔（当没有待处理 job 时使用），默认 20ms。
+  /// timeout: 可选的超时，超时后会自动停止循环并记录日志。
+  void startPending({
+    Duration pollInterval = const Duration(milliseconds: 20),
+    Duration? timeout,
+  }) {
+    if (_pendingLoopRunning) return;
+    _pendingLoopRunning = true;
+    _pendingLoopCancelRequested = false;
+
+    if (timeout != null) {
+      try {
+        _pendingTimeoutTimer = Timer(timeout, () {
+          Get.log('Pending job loop timeout after ${timeout.inMilliseconds}ms');
+          try {
+            endPending();
+          } catch (_) {}
+        });
+      } catch (_) {
+        _pendingTimeoutTimer = null;
+      }
+    }
+
+    Future.microtask(() async {
+      try {
+        while (_pendingLoopRunning && !_pendingLoopCancelRequested) {
+          int result = runtime.executePendingJob();
+          if (result > 0) {
+            Get.log('Pending job result: $result');
+            while (result > 0 &&
+                _pendingLoopRunning &&
+                !_pendingLoopCancelRequested) {
+              result = runtime.executePendingJob();
+              if (result > 0) Get.log('Pending job result: $result');
+            }
+            await Future.microtask(() {});
+            continue;
+          }
+
+          await Future.delayed(pollInterval);
+        }
+      } catch (e, st) {
+        Get.log('Pending job loop error: $e\n$st');
+      } finally {
+        _pendingLoopRunning = false;
+        try {
+          _pendingTimeoutTimer?.cancel();
+        } catch (_) {}
+        _pendingTimeoutTimer = null;
+      }
+    });
+  }
+
+  /// 停止 pending job 循环
+  void endPending() {
+    _pendingLoopCancelRequested = true;
+    _pendingLoopRunning = false;
+    try {
+      _pendingTimeoutTimer?.cancel();
+    } catch (_) {}
+    _pendingTimeoutTimer = null;
   }
 
   void _onRuntimeMessage(dynamic args) {

@@ -26,7 +26,6 @@ function registConsole() {
 function createRandomUint8Array(length) {
     const array = new Uint8Array(length);
     for (let i = 0; i < length; i++) {
-        // 生成0-255之间的随机整数
         array[i] = Math.floor(Math.random() * 256);
     }
     return array;
@@ -210,6 +209,8 @@ function bufferFromUtf8String(input, enc) {
 
     // on(event, handler)
     function on(event, handler) {
+
+        console.log('lx_bridge on:', event);
         if (typeof handler !== 'function') return;
         if (!listeners.has(event)) listeners.set(event, []);
         listeners.get(event).push(handler);
@@ -217,31 +218,14 @@ function bufferFromUtf8String(input, enc) {
 
     // send(event, data)
     function send(event, data) {
+        console.log('lx_bridge send:', event);
         try {
             const payload = JSON.stringify(data == null ? null : data);
             sendMessage('__lx_send__', JSON.stringify([event, payload]));
         } catch (e) { }
     }
 
-    // request(url, options, cb)
-    function request(url, options, cb) {
-        const fetchOptions = Object.assign({}, options || {});
-        if (fetchOptions && fetchOptions.body && typeof fetchOptions.body === 'object' && !(fetchOptions.body instanceof Uint8Array)) {
-            try { fetchOptions.body = JSON.stringify(fetchOptions.body); } catch (_) { }
-            fetchOptions.headers = fetchOptions.headers || {};
-            const h = fetchOptions.headers;
-            const key = Object.keys(h).find(k => k.toLowerCase() === 'content-type');
-            if (!key) h['content-type'] = 'application/json;charset=UTF-8';
-        }
-        fetch(url, fetchOptions).then(async resp => {
-            let bodyText = '';
-            try { bodyText = await resp.text(); } catch (_) { }
-            let bodyParsed = bodyText;
-            try { bodyParsed = JSON.parse(bodyText); } catch (_) { }
-            cb && cb(null, { statusCode: resp.status || 200, headers: {}, body: bodyParsed }, bodyText);
-        }).catch(err => { cb && cb(err, null, null); });
-        return function cancel() { };
-    }
+
 
     function __lx_emit_request(arg) {
         const ls = listeners.get(EVENT_NAMES.request) || [];
@@ -257,13 +241,46 @@ function bufferFromUtf8String(input, enc) {
     // 安装到全局
     // 由 Dart 端替换占位符 __HEADER_JSON__
     globalThis.lx = Object.freeze({
-        version: '1.0.0',
+        version: '2.0.0',
         env: 'desktop',
         currentScriptInfo: __HEADER_JSON__,
         EVENT_NAMES,
         on,
         send,
-        request,
+        request: function request(url, { method = 'get', timeout, headers, body, form, formData }, cb) {
+            let xhr = new XMLHttpRequest();
+            Object.keys(headers || {}).forEach(key => {
+                xhr.setRequestHeader(key, headers[key]);
+            });
+            xhr.open(method.toUpperCase(), url);
+            xhr.timeout = timeout || 8000;
+            xhr.send(body || form || formData);
+            xhr.onload = function () {
+                const resp = {
+                    statusCode: xhr.status,
+                    statusMessage: xhr.statusText,
+                    bytes: xhr.responseText.length,
+                    headers: headers,
+                    raw: bufferFromUtf8String(xhr.responseText),
+                    body: JSON.parse(xhr.responseText)
+                };
+                try {
+                    cb(null, resp, xhr.responseText);
+                } catch (e) {
+                    Object.keys(e).forEach(key => {
+                        console.log(`${key}: ${e[key]}`);
+                    });
+                    console.log("error")
+                }
+                console.log("cbf")
+            };
+
+            xhr.onerror = function () {
+                console.log("error2")
+                cb && cb(new Error(""), null, null);
+            };
+            return function cancel() { xhr.abort(); };
+        },
         utils: {
             buffer: {
                 from: bufferFromUtf8String,
