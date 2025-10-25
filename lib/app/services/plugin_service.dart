@@ -211,11 +211,11 @@ class PluginService extends GetxService {
       }
     }
     Object? lastError;
-    for (final c in candidates) {
+    for (final candidate in candidates) {
       try {
         final url = await eng.getMusicUrl(
           source: source,
-          type: c,
+          type: candidate,
           musicInfo: musicInfo,
         );
         return url;
@@ -244,8 +244,8 @@ class PluginService extends GetxService {
     _persistState();
   }
 
-  void setType(String? type) {
-    selectedType.value = (type ?? '').trim();
+  void setType(String type) {
+    selectedType.value = type.trim();
     _persistState();
   }
 

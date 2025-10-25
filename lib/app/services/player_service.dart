@@ -66,11 +66,7 @@ class PlayerService extends GetxService {
     });
     _bufSub = _player.bufferedPositionStream.listen((d) => buffered.value = d);
     _durSub = _player.durationStream.listen((d) => duration.value = d);
-    // 保险：周期性驱动一次歌词同步，防止个别平台 positionStream 不稳定
-    _lyricTimer?.cancel();
-    _lyricTimer = Timer.periodic(const Duration(milliseconds: 300), (_) {
-      _updateLyricForPosition(position.value);
-    });
+
     return this;
   }
 
@@ -208,10 +204,9 @@ class PlayerService extends GetxService {
     });
     if (idx < 0 || idx >= queue.length) return;
     final item = queue[idx];
-    // 设置元数据
+    await _player.clearAudioSources();
     await pause();
     await seek(Duration.zero);
-
     currentIndex.value = idx;
     setMetadata(
       title: item.name,
@@ -222,12 +217,16 @@ class PlayerService extends GetxService {
     // 获取播放地址
     try {
       final plugin = Get.find<PluginService>();
+      currentLyricLine.value = '正在获取播放地址...';
+      Get.log('获取播放地址: ${item.source} - ${item.id}');
       final url = await plugin.getMusicUrlForSource(
         source: item.source,
         musicInfo: {'songmid': item.id, 'source': item.source},
       );
+
       await setUrl(url);
     } catch (e) {
+      currentLyricLine.value = '获取播放地址失败';
       error.value = '获取播放地址失败: $e';
       return;
     }
