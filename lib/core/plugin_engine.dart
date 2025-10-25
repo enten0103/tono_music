@@ -190,7 +190,7 @@ class PluginEngine {
   }
 
   void _onRuntimeMessage(dynamic args) {
-    if (args! is List) {
+    if (args is! List) {
       return;
     }
     List<dynamic> tuple = args;
