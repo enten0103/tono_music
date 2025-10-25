@@ -49,7 +49,9 @@ class PlayerService extends GetxService {
     _stateSub = _player.playerStateStream.listen((s) async {
       playing.value = s.playing;
       if (s.processingState == ProcessingState.completed) {
-        if (queue.isNotEmpty && loopList.value) {
+        if (queue.isNotEmpty &&
+            loopList.value &&
+            _player.position.inSeconds != 0) {
           Get.log('自动播放下一首');
           await next();
         } else {
@@ -156,7 +158,6 @@ class PlayerService extends GetxService {
     super.onClose();
   }
 
-  // ========== 队列/切歌相关 ==========
   Future<void> setQueueFromPlaylist(
     List<PlayItem> items, {
     required String startId,
@@ -174,14 +175,6 @@ class PlayerService extends GetxService {
     currentIndex.value = 0;
     loopList.value = true; // 默认顺序循环
     await _playByIndex(startIdx);
-  }
-
-  Future<void> randomPlay() async {
-    if (queue.isEmpty) return;
-    final idx = (queue.length > 1)
-        ? (DateTime.now().millisecondsSinceEpoch % queue.length)
-        : 0;
-    await _playByIndex(idx);
   }
 
   Future<void> previous() async {
@@ -210,7 +203,7 @@ class PlayerService extends GetxService {
   Future<void> _playByIndex(int idx) async {
     if (_nextLock) return;
     _nextLock = true;
-    Timer(const Duration(milliseconds: 500), () {
+    Timer(const Duration(milliseconds: 1000), () {
       _nextLock = false;
     });
     if (idx < 0 || idx >= queue.length) return;
@@ -232,7 +225,6 @@ class PlayerService extends GetxService {
       final url = await plugin.getMusicUrlForSource(
         source: item.source,
         musicInfo: {'songmid': item.id, 'source': item.source},
-        preferredType: null,
       );
       await setUrl(url);
     } catch (e) {

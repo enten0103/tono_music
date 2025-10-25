@@ -20,7 +20,7 @@ class PluginService extends GetxService {
 
   // 维护当前选择的 source 与 type（音质）。
   final RxString selectedSource = ''.obs;
-  final RxString selectedType = ''.obs; // 128k/320k/flac/flac24bit 或空
+  final RxString selectedType = 'flac'.obs; // 128k/320k/flac/flac24bit
   // 缓存最近一次 inited 的 sources，便于根据 source 计算默认 type
   final RxMap<String, SourceSpec> sources = <String, SourceSpec>{}.obs;
 
@@ -188,94 +188,28 @@ class PluginService extends GetxService {
     return eng.request(source: source, action: action, info: info);
   }
 
-  /// 便捷方法：获取歌曲 URL
-  Future<String> getMusicUrl({
-    required String source,
-    String? type,
-    required Map<String, dynamic> musicInfo,
-  }) async {
-    final eng = engine;
-    if (eng == null) throw Exception('engine not ready');
-    return eng.getMusicUrl(source: source, type: type, musicInfo: musicInfo);
-  }
-
-  // 使用当前维护的 source/type 调用便捷方法（若 type 为空则传 null）。
-  Future<String> getMusicUrlUsingSelection({
-    required Map<String, dynamic> musicInfo,
-  }) async {
-    final eng = engine;
-    if (eng == null) throw Exception('engine not ready');
-    final s = selectedSource.value;
-    if (s.isEmpty) throw Exception('no source selected');
-    final spec = sources[s];
-    final qualitys = spec?.qualitys ?? const <String>[];
-
-    // 生成尝试顺序：当前选中优先，然后其余；若无可选音质（如 local），则尝试 null
-    final start = selectedType.value.trim();
-    final List<String?> candidates = [];
-    if (qualitys.isEmpty) {
-      candidates.add(null);
-    } else if (start.isNotEmpty && qualitys.contains(start)) {
-      candidates.add(start);
-      for (final q in qualitys) {
-        if (q != start) candidates.add(q);
-      }
-    } else {
-      for (final q in qualitys) {
-        candidates.add(q);
-      }
-    }
-
-    Object? lastError;
-    for (final c in candidates) {
-      try {
-        final url = await eng.getMusicUrl(
-          source: s,
-          type: c,
-          musicInfo: musicInfo,
-        );
-        // 成功则同步当前选择
-        selectedType.value = (c ?? '').toString();
-        return url;
-      } catch (e) {
-        lastError = e;
-        // 继续尝试下一种音质
-      }
-    }
-    // 全部失败
-    final tried = candidates.map((e) => e ?? '').join(',');
-    throw Exception(
-      'getMusicUrl failed for source=$s, tried types=[$tried], lastError=$lastError',
-    );
-  }
-
-  /// 显式指定源的便捷方法：按给定 source 依序尝试音质，获取歌曲 URL。
-  /// 不会修改当前的 selectedSource/selectedType。
+  /// 按给定 source 依序尝试音质，获取歌曲 URL。
   Future<String> getMusicUrlForSource({
     required String source,
     required Map<String, dynamic> musicInfo,
-    String? preferredType,
   }) async {
     final eng = engine;
     if (eng == null) throw Exception('engine not ready');
     final spec = sources[source];
-    final qualitys = spec?.qualitys ?? const <String>[];
+    final qualitys = spec?.qualitys ?? <String>[];
 
-    final List<String?> candidates = [];
-    final start = (preferredType ?? '').trim();
+    final List<String> candidates = [];
+    final start = selectedType.value.trim();
     if (start.isNotEmpty && qualitys.contains(start)) {
       candidates.add(start);
-      for (final q in qualitys) {
-        if (q != start) candidates.add(q);
+      for (final quality in qualitys) {
+        if (quality != start) candidates.add(quality);
       }
     } else if (qualitys.isNotEmpty) {
-      for (final q in qualitys) {
-        candidates.add(q);
+      for (final quality in qualitys) {
+        candidates.add(quality);
       }
-    } else {
-      candidates.add(null);
     }
-
     Object? lastError;
     for (final c in candidates) {
       try {
@@ -289,7 +223,7 @@ class PluginService extends GetxService {
         lastError = e;
       }
     }
-    final tried = candidates.map((e) => e ?? '').join(',');
+    final tried = candidates.map((e) => e).join(',');
     throw Exception(
       'getMusicUrlForSource failed for source=$source, tried types=[$tried], lastError=$lastError',
     );
@@ -395,7 +329,8 @@ class PluginService extends GetxService {
       currentScriptInfo.assignAll(eng.getCurrentScriptInfo());
       final payload = InitedPayload.fromJson(inited);
       _updateSelectionFromInited(payload);
-    } catch (_) {
+    } catch (e) {
+      Get.log("Error occurred while autoloading: $e", isError: true);
       // ignore autoload failure
     }
   }
