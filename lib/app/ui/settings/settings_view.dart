@@ -74,13 +74,6 @@ class SettingsView extends GetView<SettingsController> {
           label: const Text('通知授权'),
         ),
         const Divider(),
-        ListTile(
-          leading: const Icon(Icons.science_outlined),
-          title: const Text('插件测试页'),
-          subtitle: const Text('快速导入并调用 getmusicUrl'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Get.toNamed(AppRoutes.testPlugin),
-        ),
       ],
     );
   }
