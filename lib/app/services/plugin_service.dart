@@ -134,13 +134,44 @@ class PluginService extends GetxService {
     return eng.getCurrentScriptInfo(includeRaw: includeRaw);
   }
 
-  void activate(int index) {
+  Future<void> activate(int index) async {
     if (index < 0 || index >= loadedPlugins.length) {
       return;
     }
+    final info = loadedPlugins[index];
+    final sourceUrl = (info['sourceUrl'] ?? '').toString();
     activeIndex.value = index;
-    currentScriptInfo.assignAll(loadedPlugins[index]);
-    _persistState();
+    // Persist early so UI reflects selection immediately
+    await _persistState();
+
+    // If there is a sourceUrl, attempt to (re)load the script into the engine
+    final eng = engine;
+    if (eng == null) return;
+
+    try {
+      await eng.reset();
+      String? script;
+      if (sourceUrl.startsWith('assets/')) {
+        script = await rootBundle.loadString(sourceUrl);
+      } else if (sourceUrl.isNotEmpty) {
+        final f = File(sourceUrl);
+        if (await f.exists()) script = await f.readAsString();
+      }
+      if (script != null) {
+        final inited = await eng.loadScript(script, sourceUrl: sourceUrl);
+        currentScriptInfo.assignAll(eng.getCurrentScriptInfo());
+        final payload = InitedPayload.fromJson(inited);
+        _updateSelectionFromInited(payload);
+      } else {
+        // If no script (e.g., transient plugin), still update currentScriptInfo from stored info
+        currentScriptInfo.assignAll(info);
+      }
+      await _persistState();
+    } catch (e, st) {
+      Get.log('Error activating plugin: $e\n$st', isError: true);
+      // restore currentScriptInfo to the stored info so UI remains consistent
+      currentScriptInfo.assignAll(info);
+    }
   }
 
   void removeAt(int index) {

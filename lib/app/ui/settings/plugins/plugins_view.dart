@@ -43,7 +43,6 @@ class PluginsView extends GetView<PluginsController> {
             }),
             const SizedBox(height: 12),
             Obx(() {
-              // 绑定到 reactive 的 currentScriptInfo，避免 Obx 警告
               final info = controller.currentScriptInfo;
               final name = (info['name'] ?? '').toString();
               if (name.isEmpty) return const SizedBox.shrink();
@@ -75,6 +74,15 @@ class PluginsView extends GetView<PluginsController> {
               );
             }),
             const SizedBox(height: 12),
+            // 激活/加载时的全局 loading 指示
+            Obx(() {
+              return controller.busy.value
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: LinearProgressIndicator(),
+                    )
+                  : const SizedBox.shrink();
+            }),
             Expanded(
               child: Obx(() {
                 final list = controller.loadedPlugins;
@@ -90,33 +98,37 @@ class PluginsView extends GetView<PluginsController> {
                     final name = item['name'] ?? '-';
                     final ver = item['version'] ?? '-';
                     final author = item['author'] ?? '-';
-                    final isActive = controller.activeIndex.value == i;
-                    return ListTile(
-                      key: ValueKey('plugin_$i'),
-                      leading: Icon(
-                        isActive
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                        color: isActive ? Colors.green : null,
-                      ),
-                      title: Text(name),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [Text('v$ver  ·  $author')],
-                      ),
-                      onTap: () => controller.activate(i),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: '删除',
-                            onPressed: () => controller.removeAt(i),
-                          ),
-                        ],
-                      ),
-                    );
+                    final stableKey =
+                        (item['sourceUrl'] ?? item['name'] ?? 'plugin_$i')
+                            .toString();
+                    return Obx(() {
+                      final isActive = controller.activeIndex.value == i;
+                      return ListTile(
+                        leading: Icon(
+                          isActive
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: isActive ? Colors.green : null,
+                        ),
+                        title: Text(name),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [Text('v$ver  ·  $author')],
+                        ),
+                        onTap: () => controller.activate(i),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              tooltip: '删除',
+                              onPressed: () => controller.removeAt(i),
+                            ),
+                          ],
+                        ),
+                      );
+                    }, key: ValueKey(stableKey));
                   },
                 );
               }),

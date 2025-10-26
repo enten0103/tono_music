@@ -5,7 +5,7 @@ class PluginsController extends GetxController {
   final RxBool busy = false.obs;
   final RxString log = ''.obs;
 
-  late final PluginService service;
+  late final PluginService service = Get.find();
 
   RxMap<String, dynamic> get currentScriptInfo => service.currentScriptInfo;
   RxBool get ready => service.ready;
@@ -15,7 +15,6 @@ class PluginsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    service = Get.find<PluginService>();
     // 当引擎就绪后，监听其事件到本地日志
     ever<bool>(service.ready, (isReady) {
       if (isReady) {
@@ -54,5 +53,14 @@ class PluginsController extends GetxController {
   void removeAt(int index) => service.removeAt(index);
   void reorder(int oldIndex, int newIndex) =>
       service.reorder(oldIndex, newIndex);
-  void activate(int index) => service.activate(index);
+  Future<void> activate(int index) async {
+    busy.value = true;
+    try {
+      await service.activate(index);
+    } catch (e) {
+      log.value = '激活插件失败: $e';
+    } finally {
+      busy.value = false;
+    }
+  }
 }
