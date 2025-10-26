@@ -53,8 +53,6 @@ class SearchSongController extends GetxController {
       tracks.addAll(items);
 
       // 简单判断是否还有更多：若返回数量小于请求页大小则无更多
-      // 如果 music_sdk 提供总页数/hasMore 字段，可用更精准判断
-
       final int pageSize = items.length;
       if (pageSize == 0) {
         hasMore.value = false;
