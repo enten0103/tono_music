@@ -58,7 +58,7 @@ class PluginEngine {
   }
 
   Future<void> _initRuntime() async {
-    runtime = getJavascriptRuntime(forceJavascriptCoreOnAndroid: true);
+    runtime = getJavascriptRuntime();
     runtime.enableHandlePromises();
     await runtime.enableFetch();
   }
@@ -83,7 +83,6 @@ class PluginEngine {
     required String action,
     required Map<String, dynamic> info,
   }) async {
-    startPending();
     final argsJson = jsonEncode({
       'source': source,
       'action': action,
@@ -96,7 +95,6 @@ class PluginEngine {
       throw Exception('request error: ${handled.stringResult}');
     }
     final str = handled.stringResult;
-    endPending();
     try {
       return jsonDecode(str);
     } catch (_) {
@@ -177,6 +175,7 @@ class PluginEngine {
         );
       },
     );
+
     endPending();
     return data;
   }
