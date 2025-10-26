@@ -223,8 +223,8 @@ class PlayerService extends GetxService {
         source: item.source,
         musicInfo: {'songmid': item.id, 'source': item.source},
       );
-
       await setUrl(url);
+      currentLyricLine.value = '';
     } catch (e) {
       currentLyricLine.value = '获取播放地址失败';
       error.value = '获取播放地址失败: $e';

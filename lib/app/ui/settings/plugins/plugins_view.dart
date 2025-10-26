@@ -21,16 +21,6 @@ class PluginsView extends GetView<PluginsController> {
             icon: const Icon(Icons.file_upload_outlined),
             onPressed: controller.importFromFile,
           ),
-          PopupMenuButton<String>(
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'import-asset', child: Text('导入内置示例')),
-            ],
-            onSelected: (v) {
-              if (v == 'import-asset') {
-                controller.importFromAsset('assets/lx-music-source V3.0.js');
-              }
-            },
-          ),
         ],
       ),
       body: Padding(

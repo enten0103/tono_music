@@ -207,10 +207,7 @@ function bufferFromUtf8String(input, enc) {
     const EVENT_NAMES = { inited: 'inited', request: 'request', updateAlert: 'updateAlert' };
     const listeners = new Map();
 
-    // on(event, handler)
     function on(event, handler) {
-
-        console.log('lx_bridge on:', event);
         if (typeof handler !== 'function') return;
         if (!listeners.has(event)) listeners.set(event, []);
         listeners.get(event).push(handler);
@@ -218,7 +215,6 @@ function bufferFromUtf8String(input, enc) {
 
     // send(event, data)
     function send(event, data) {
-        console.log('lx_bridge send:', event);
         try {
             const payload = JSON.stringify(data == null ? null : data);
             sendMessage('__lx_send__', JSON.stringify([event, payload]));
@@ -264,19 +260,11 @@ function bufferFromUtf8String(input, enc) {
                     raw: bufferFromUtf8String(xhr.responseText),
                     body: JSON.parse(xhr.responseText)
                 };
-                try {
-                    cb(null, resp, xhr.responseText);
-                } catch (e) {
-                    Object.keys(e).forEach(key => {
-                        console.log(`${key}: ${e[key]}`);
-                    });
-                    console.log("error")
-                }
-                console.log("cbf")
+                cb && cb(null, resp, xhr.responseText);
+
             };
 
             xhr.onerror = function () {
-                console.log("error2")
                 cb && cb(new Error(""), null, null);
             };
             return function cancel() { xhr.abort(); };
