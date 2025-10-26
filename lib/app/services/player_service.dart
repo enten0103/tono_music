@@ -1,13 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:get/get.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:music_sdk/music_sdk.dart';
 import 'plugin_service.dart';
 
 @pragma("vm:entry-point")
 class PlayerService extends GetxService {
-  final AudioPlayer _player = AudioPlayer();
+  final Player _player = Player();
   final RxBool playing = false.obs;
   final Rx<Duration> position = Duration.zero.obs;
   final Rx<Duration> buffered = Duration.zero.obs;
@@ -20,6 +21,7 @@ class PlayerService extends GetxService {
   final RxString currentSongId = ''.obs;
   final RxString currentSource = ''.obs;
   final RxString currentLyricLine = ''.obs;
+  final RxList<String> artists = <String>[].obs;
   final RxInt currentLyricIndex = (-1).obs;
 
   // 播放队列与索引
@@ -29,8 +31,8 @@ class PlayerService extends GetxService {
   final RxBool loopList = true.obs;
 
   StreamSubscription<Duration>? _posSub;
-  StreamSubscription<Duration>? _bufSub;
-  StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<Duration?>? _bufSub;
+  StreamSubscription<dynamic>? _stateSub;
   StreamSubscription<Duration?>? _durSub;
   Timer? _lyricTimer;
 
@@ -40,50 +42,59 @@ class PlayerService extends GetxService {
 
   Future<PlayerService> init() async {
     try {
-      final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration.music());
+      if (!Platform.isWindows) {
+        final session = await AudioSession.instance;
+        await session.configure(const AudioSessionConfiguration.music());
+      }
     } catch (_) {
       // 某些平台上可能没有实现，忽略以不影响播放
     }
 
-    _stateSub = _player.playerStateStream.listen((s) async {
-      playing.value = s.playing;
-      if (s.processingState == ProcessingState.completed) {
-        if (queue.isNotEmpty &&
-            loopList.value &&
-            _player.position.inSeconds != 0) {
-          Get.log('自动播放下一首');
-          await next();
-        } else {
-          await _player.stop();
-        }
-      }
+    _player.stream.playing.listen((state) {
+      playing.value = state;
     });
 
-    _posSub = _player.positionStream.listen((d) {
+    _player.stream.completed.listen((state) {
+      if (queue.isNotEmpty &&
+          loopList.value &&
+          _player.state.position.inSeconds != 0) {
+        next();
+      } else {
+        _player.stop();
+      }
+    });
+    _posSub = _player.stream.position.listen((d) {
       position.value = d;
       _updateLyricForPosition(d);
     });
-    _bufSub = _player.bufferedPositionStream.listen((d) => buffered.value = d);
-    _durSub = _player.durationStream.listen((d) => duration.value = d);
+
+    _durSub = _player.stream.duration.listen((d) => duration.value = d);
 
     return this;
   }
 
   Future<void> setUrl(String url) async {
+    Get.log('播放地址: $url');
     error.value = '';
     try {
-      await _player.setUrl(url);
+      await _player.open(Media(url), play: false);
     } catch (e) {
       error.value = e.toString();
     }
   }
 
-  void setMetadata({String? title, String? cover, String? id, String? source}) {
+  void setMetadata({
+    String? title,
+    String? cover,
+    String? id,
+    String? source,
+    List<String>? artists,
+  }) {
     if (title != null) currentTitle.value = title;
     if (cover != null) currentCover.value = cover;
     if (id != null) currentSongId.value = id;
     if (source != null) currentSource.value = source;
+    if (artists != null) this.artists.assignAll(artists);
   }
 
   void setLyricLine(String text) {
@@ -92,6 +103,7 @@ class PlayerService extends GetxService {
 
   Future<void> play() => _player.play();
   Future<void> pause() => _player.pause();
+
   Future<void> stop() => _player.stop();
   Future<void> seek(Duration d) => _player.seek(d);
 
@@ -204,8 +216,7 @@ class PlayerService extends GetxService {
     });
     if (idx < 0 || idx >= queue.length) return;
     final item = queue[idx];
-    await _player.clearAudioSources();
-    await pause();
+    await _player.pause();
     await seek(Duration.zero);
     currentIndex.value = idx;
     setMetadata(
@@ -213,12 +224,12 @@ class PlayerService extends GetxService {
       cover: item.coverUrl,
       id: item.id,
       source: item.source,
+      artists: item.artists,
     );
     // 获取播放地址
     try {
       final plugin = Get.find<PluginService>();
       currentLyricLine.value = '正在获取播放地址...';
-      Get.log('获取播放地址: ${item.source} - ${item.id}');
       final url = await plugin.getMusicUrlForSource(
         source: item.source,
         musicInfo: {'songmid': item.id, 'source': item.source},

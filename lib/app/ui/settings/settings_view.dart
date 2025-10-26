@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tono_music/app/routes/app_routes.dart';
 import 'package:tono_music/app/services/notification_service.dart';
-import '../../routes/app_routes.dart';
 import 'settings_controller.dart';
 
 class SettingsView extends GetView<SettingsController> {

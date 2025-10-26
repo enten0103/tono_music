@@ -2,29 +2,26 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smtc_windows/smtc_windows.dart';
 import 'package:tono_music/app/services/log_service.dart';
 import 'package:tono_music/app/services/notification_service.dart';
 import 'package:tono_music/app/services/player_service.dart';
 import 'package:tono_music/app/services/plugin_service.dart';
+import 'package:tono_music/app/services/smtc_service.dart';
 import 'package:window_manager/window_manager.dart';
 
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // // Debug: 监听原始键盘事件，打印事件与当前按下的物理键（仅在调试模式）
-  // if (kDebugMode) {
-  //   RawKeyboard.instance.addListener((RawKeyEvent e) {
-  //     try {
-  //       debugPrint('RawKeyEvent: $e');
-  //       debugPrint(
-  //         'Physical pressed keys: ${HardwareKeyboard.instance.physicalKeysPressed}',
-  //       );
-  //     } catch (_) {}
-  //   });
-  // }
+  MediaKit.ensureInitialized();
+  if (Platform.isWindows) {
+    await SMTCWindows.initialize();
+  }
   await initWindow();
-  await initDependencies();
   await initImageCache();
+
+  await initDependencies();
 }
 
 Future<void> initDependencies() async {
@@ -39,6 +36,10 @@ Future<void> initDependencies() async {
   if (Platform.isAndroid) {
     final notificationService = await NotificationService().init();
     Get.put<NotificationService>(notificationService);
+  }
+  if (Platform.isWindows) {
+    final smtcService = await SMTCService().init();
+    Get.put<SMTCService>(smtcService);
   }
 }
 

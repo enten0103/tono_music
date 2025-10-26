@@ -29,7 +29,6 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
 - [ ] uiils.zlib.inflate
 - [ ] uiils.zlib.deflate
 
-> request不具有取消功能
 
 功能
 
@@ -48,10 +47,35 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
     - [ ] 歌单导入
 - [ ] 其它功能
 
+平台相关
+
+- [] windows
+    - [] 标准控制
+    - [] 托盘
+- [] andorid
+    - [] 通知栏
+    - [] 标准控制
+- [] ios
+    - [] 通知栏
+    - [] 标准控制
+- [] mac
+    - [] 标准控制
+    - [] 托盘
+缓存相关
+- [] 封面缓存
+- [] 歌词缓存
+- [] url缓存
+- [] 歌曲缓存
+
+
 # Q&A
 
 Q:为什么在LXmusic中可以正常工作的插件无法运行  
 A:项目仍处在开发中，目前仅实现了最小的兼容。已知处于被混淆状态的脚本会出现严重的运行问题。
 
 Q:为什么只有两个在线音源支持  
-A:部分平台SDK强依赖于js运行时，难以复刻为dart代码
+A:部分平台SDK强依赖于js运行时，难以复刻为dart代码  
+
+Q:为什么没有鸿蒙相关支持计划  
+A:插件运行时依赖于quickjs或其它js运行时，目前未见移植
+
