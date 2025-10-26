@@ -30,6 +30,7 @@ dependencies:
   smtc_windows: ^1.1.0
   media_kit: ^1.2.1
   media_kit_libs_audio: ^1.0.7
+  tray_manager: ^0.5.1
 
 dev_dependencies:
   flutter_test:

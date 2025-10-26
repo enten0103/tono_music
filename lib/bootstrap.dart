@@ -9,6 +9,7 @@ import 'package:tono_music/app/services/log_service.dart';
 import 'package:tono_music/app/services/notification_service.dart';
 import 'package:tono_music/app/services/player_service.dart';
 import 'package:tono_music/app/services/plugin_service.dart';
+import 'package:tono_music/app/services/tray_service.dart';
 import 'package:tono_music/app/services/smtc_service.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -33,6 +34,11 @@ Future<void> initDependencies() async {
 
   final pluginService = await PluginService().init();
   Get.put<PluginService>(pluginService);
+
+  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+    final trayService = await TrayService().init();
+    Get.put<TrayService>(trayService);
+  }
   if (Platform.isAndroid) {
     final notificationService = await NotificationService().init();
     Get.put<NotificationService>(notificationService);
@@ -61,6 +67,12 @@ Future<void> initImageCache() async {
 Future<void> initWindow() async {
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
     await windowManager.ensureInitialized();
+    // 当窗口被关闭时不退出应用（隐藏到系统托盘）
+    // 需要配合托盘服务使用：关闭操作会隐藏窗口，托盘菜单提供退出入口
+    try {
+      await windowManager.setPreventClose(true);
+      windowManager.addListener(_HideOnCloseListener());
+    } catch (_) {}
     const windowOptions = WindowOptions(
       title: 'TonoMusic',
       size: Size(1280, 800),
@@ -72,5 +84,15 @@ Future<void> initWindow() async {
       await windowManager.show();
       await windowManager.focus();
     });
+  }
+}
+
+class _HideOnCloseListener with WindowListener {
+  @override
+  void onWindowClose() async {
+    // 当窗口关闭时改为隐藏到托盘
+    try {
+      await windowManager.hide();
+    } catch (_) {}
   }
 }
