@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:tono_music/app/services/player_service.dart';
+import 'package:tono_music/app/services/lyrics_overlay_controller.dart';
+import 'package:tono_music/app/services/lyrics_overlay_service.dart';
 
 class TrayService extends GetxService with TrayListener {
   final PlayerService _player = Get.find();
@@ -41,10 +43,16 @@ class TrayService extends GetxService with TrayListener {
 
   Future<Menu> _buildMenu() async {
     final isPlaying = _player.playing.value;
+    final isClickThrough = LyricsOverlayService.instance.isClickThrough;
+    final lockLabel = isClickThrough ? '解锁歌词（允许交互）' : '锁定歌词（点击穿透）';
     return Menu(
       items: [
         MenuItem(key: 'show', label: '显示主窗口'),
         MenuItem(key: 'hide', label: '隐藏'),
+        MenuItem.separator(),
+        MenuItem(key: 'show_lyrics', label: '显示歌词'),
+        MenuItem(key: 'hide_lyrics', label: '隐藏歌词'),
+        MenuItem(key: 'toggle_lyrics_lock', label: lockLabel),
         MenuItem.separator(),
         MenuItem(key: 'prev', label: '上一曲'),
         MenuItem(key: 'play_pause', label: isPlaying ? '暂停' : '播放'),
@@ -93,6 +101,32 @@ class TrayService extends GetxService with TrayListener {
         break;
       case 'next':
         _player.next();
+        break;
+      case 'show_lyrics':
+        try {
+          final ctrl = Get.find<LyricsOverlayController>();
+          ctrl.show();
+        } catch (_) {}
+        break;
+      case 'hide_lyrics':
+        try {
+          final ctrl = Get.find<LyricsOverlayController>();
+          ctrl.hide();
+        } catch (_) {}
+        break;
+      case 'toggle_lyrics_lock':
+        try {
+          final ctrl = Get.find<LyricsOverlayController>();
+          // toggle click-through based on current known state
+          final current = LyricsOverlayService.instance.isClickThrough;
+          final newState = !current;
+          await ctrl.toggleClickThrough(newState);
+          // rebuild menu to reflect new label
+          try {
+            final newMenu = await _buildMenu();
+            await trayManager.setContextMenu(newMenu);
+          } catch (_) {}
+        } catch (_) {}
         break;
       case 'exit':
         try {

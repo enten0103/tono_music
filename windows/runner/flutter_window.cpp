@@ -3,6 +3,21 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
+#include <flutter/encodable_value.h>
+#include <memory>
+#include <string>
+#include <windows.h>
+#include <shellapi.h>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <cstdlib>
+
+#include "lyrics_overlay.h"
+
+
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +40,14 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  // Expose a lightweight MethodChannel for window control (click-through).
+  // Dart can call method "setClickThrough" with a boolean payload to enable
+  // or disable mouse passthrough on the main window.
+  {
+    auto messenger = flutter_controller_->engine()->messenger();
+    // Delegate the overlay and window channel handling to lyrics_overlay module.
+    RegisterLyricsOverlayChannel(messenger, flutter_controller_.get());
+  }
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
