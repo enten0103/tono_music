@@ -158,9 +158,6 @@ class PluginEngine {
     if (handled.isError) {
       throw Exception('Plugin script error: ${handled.stringResult}');
     }
-    for (var i = 0; i < 100; i++) {
-      runtime.executePendingJob();
-    }
 
     startPending();
 
