@@ -3,9 +3,8 @@ import 'package:music_sdk/music_sdk.dart';
 
 class PlaylistDetailController extends GetxController {
   late final String playlistId;
-  late final String source; // 'wy' | 'tx' | 'kg'
+  late final String source; // 'wy' | 'tx'
   final RxString title = ''.obs;
-  final RxString coverUrl = ''.obs;
 
   final RxBool loading = false.obs;
   final RxString error = ''.obs;
@@ -30,7 +29,6 @@ class PlaylistDetailController extends GetxController {
     playlistId = args?['id']?.toString() ?? '';
     source = args?['source']?.toString() ?? 'wy';
     title.value = args?['name']?.toString() ?? '';
-    coverUrl.value = args?['coverUrl']?.toString() ?? '';
     _load();
   }
 

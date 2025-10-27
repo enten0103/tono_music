@@ -6,6 +6,7 @@ import 'package:tono_music/app/widgets/play_list_card.dart';
 import 'square_controller.dart';
 import '../root/root_controller.dart';
 import 'package:flutter/rendering.dart';
+import '../../routes/app_routes.dart';
 
 class SquareView extends GetView<SquareController> {
   const SquareView({super.key});
@@ -39,6 +40,47 @@ class SquareView extends GetView<SquareController> {
               icon: const Icon(Icons.refresh),
               tooltip: '刷新',
               onPressed: controller.refresh,
+            ),
+            IconButton(
+              icon: const Icon(Icons.input),
+              tooltip: '输入歌单 ID',
+              onPressed: () async {
+                final id = await showDialog<String?>(
+                  context: context,
+                  builder: (ctx) {
+                    final ctrl = TextEditingController();
+                    return AlertDialog(
+                      title: const Text('输入歌单 ID'),
+                      content: TextField(
+                        controller: ctrl,
+                        decoration: const InputDecoration(hintText: '歌单 ID'),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('取消'),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(ctx).pop(ctrl.text.trim()),
+                          child: const Text('打开'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+                if (id != null && id.isNotEmpty) {
+                  // navigate to playlist detail with current source and no name
+                  Get.toNamed(
+                    AppRoutes.playlistDetail,
+                    arguments: {
+                      'id': id,
+                      'source': controller.source.value,
+                      'name': '',
+                    },
+                  );
+                }
+              },
             ),
           ],
         );
