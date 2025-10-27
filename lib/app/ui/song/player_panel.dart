@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get_state_manager/src/rx_flutter/rx_obx_widget.dart';
 import 'package:get/get_state_manager/src/simple/get_view.dart';
+import 'package:get/get.dart';
 import 'package:tono_music/app/services/player_service.dart';
+import 'package:tono_music/app/ui/favorite/favorite_controller.dart';
 import 'package:tono_music/app/widgets/queue_sheet.dart';
 
 class PlayerPanel extends GetView<PlayerService> {
@@ -18,12 +20,43 @@ class PlayerPanel extends GetView<PlayerService> {
           children: [
             Material(
               color: Colors.transparent,
-              child: IconButton(
-                icon: const Icon(Icons.favorite_outline),
-                tooltip: '收藏',
-                onPressed: () {},
-                splashRadius: 24,
-              ),
+              child: Obx(() {
+                final favCtrl = Get.find<FavoriteController>();
+                final id = controller.currentSongId.value;
+                final src = controller.currentSource.value;
+                final isFav = id.isNotEmpty && favCtrl.contains(id, src);
+                return IconButton(
+                  icon: Icon(isFav ? Icons.favorite : Icons.favorite_outline),
+                  tooltip: '收藏',
+                  onPressed: () async {
+                    // show playlist picker to add current track to a playlist
+                    final chosen = await showDialog<String?>(
+                      context: context,
+                      builder: (ctx) {
+                        return SimpleDialog(
+                          title: const Text('选择要添加的歌单'),
+                          children: favCtrl.playlists
+                              .map(
+                                (p) => SimpleDialogOption(
+                                  onPressed: () => Navigator.of(ctx).pop(p.id),
+                                  child: Text(p.name),
+                                ),
+                              )
+                              .toList(),
+                        );
+                      },
+                    );
+                    if (chosen != null) {
+                      await favCtrl.addFromPlayerToPlaylist(controller, chosen);
+                    }
+                  },
+                  splashRadius: 24,
+                  onLongPress: () async {
+                    // long press: quick toggle in default playlist
+                    await favCtrl.toggleInDefaultFromPlayer(controller);
+                  },
+                );
+              }),
             ),
             const SizedBox(width: 8),
             FilledButton(

@@ -23,8 +23,7 @@ class SettingsView extends GetView<SettingsController> {
         const SizedBox(height: 8),
         ExpansionTile(
           leading: const Icon(Icons.subtitles),
-          title: const Text('歌词覆盖'),
-          subtitle: const Text('桌面歌词层设置（Windows）'),
+          title: const Text('桌面歌词'),
           childrenPadding: const EdgeInsets.symmetric(
             horizontal: 8.0,
             vertical: 8.0,
@@ -40,7 +39,7 @@ class SettingsView extends GetView<SettingsController> {
                     Obx(
                       () => ListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('启用歌词覆盖'),
+                        title: const Text('桌面歌词'),
                         trailing: Switch(
                           value: controller.overlayEnabled.value,
                           onChanged: (v) => controller.setOverlayEnabled(v),
@@ -50,7 +49,7 @@ class SettingsView extends GetView<SettingsController> {
                     Obx(
                       () => ListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('允许鼠标穿透'),
+                        title: const Text('锁定'),
                         trailing: Switch(
                           value: controller.overlayClickThrough.value,
                           onChanged: (v) =>
