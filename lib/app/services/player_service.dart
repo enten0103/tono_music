@@ -13,7 +13,6 @@ class PlayerService extends GetxService {
   final Rx<Duration> position = Duration.zero.obs;
   final Rx<Duration> buffered = Duration.zero.obs;
   final Rx<Duration?> duration = Rx<Duration?>(null);
-  final RxString error = ''.obs;
 
   // 当前曲目信息
   final RxString currentTitle = ''.obs;
@@ -36,9 +35,10 @@ class PlayerService extends GetxService {
   StreamSubscription<Duration?>? _durSub;
   Timer? _lyricTimer;
 
-  // 歌词数据与同步（对外可观察）
   final RxList<LyricPoint> lyrics = <LyricPoint>[].obs;
   int _lastLyricIndex = -1;
+
+  bool isFetching = false;
 
   Future<PlayerService> init() async {
     try {
@@ -55,9 +55,7 @@ class PlayerService extends GetxService {
     });
 
     _player.stream.completed.listen((state) {
-      if (queue.isNotEmpty &&
-          loopList.value &&
-          _player.state.position.inSeconds != 0) {
+      if (state && queue.isNotEmpty && loopList.value) {
         next();
       } else {
         _player.stop();
@@ -75,12 +73,9 @@ class PlayerService extends GetxService {
 
   Future<void> setUrl(String url) async {
     Get.log('播放地址: $url');
-    error.value = '';
     try {
       await _player.open(Media(url), play: false);
-    } catch (e) {
-      error.value = e.toString();
-    }
+    } catch (_) {}
   }
 
   void setMetadata({
@@ -101,10 +96,13 @@ class PlayerService extends GetxService {
     currentLyricLine.value = text;
   }
 
-  Future<void> play() => _player.play();
+  Future<void> play() async {
+    if (isFetching) return;
+    _player.play();
+  }
+
   Future<void> pause() => _player.pause();
 
-  Future<void> stop() => _player.stop();
   Future<void> seek(Duration d) => _player.seek(d);
 
   void setLyrics(List<LyricPoint> list) {
@@ -172,16 +170,14 @@ class PlayerService extends GetxService {
     required String startSource,
   }) async {
     if (items.isEmpty) return;
-    // 确保点击的曲目存在
     final startIdx = items.indexWhere(
       (e) => e.id == startId && e.source == startSource,
     );
     if (startIdx < 0) return;
-    // 队列顺序始终与歌单一致，仅旋转到点击项为首
     final ordered = [...items];
     queue.assignAll(ordered);
     currentIndex.value = 0;
-    loopList.value = true; // 默认顺序循环
+    loopList.value = true;
     await _playByIndex(startIdx);
   }
 
@@ -214,11 +210,13 @@ class PlayerService extends GetxService {
     Timer(const Duration(milliseconds: 1000), () {
       _nextLock = false;
     });
+
     if (idx < 0 || idx >= queue.length) return;
     final item = queue[idx];
     await _player.pause();
     await seek(Duration.zero);
     currentIndex.value = idx;
+
     setMetadata(
       title: item.name,
       cover: item.coverUrl,
@@ -230,15 +228,17 @@ class PlayerService extends GetxService {
     try {
       final plugin = Get.find<PluginService>();
       currentLyricLine.value = '正在获取播放地址...';
+      isFetching = true;
       final url = await plugin.getMusicUrlForSource(
         source: item.source,
         musicInfo: {'songmid': item.id, 'source': item.source},
       );
+      isFetching = false;
+      currentLyricLine.value = '获取播放地址成功';
       await setUrl(url);
-      currentLyricLine.value = '';
     } catch (e) {
+      isFetching = false;
       currentLyricLine.value = '获取播放地址失败';
-      error.value = '获取播放地址失败: $e';
       return;
     }
     // 获取歌词

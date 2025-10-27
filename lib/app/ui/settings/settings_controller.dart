@@ -126,7 +126,6 @@ class SettingsController extends GetxController {
   }
 
   Future<void> setOverlayFontFamily(String family) async {
-    print(family);
     overlayFontFamily.value = family;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('overlayFontFamily', family);

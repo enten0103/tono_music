@@ -33,8 +33,9 @@ Future<void> initDependencies() async {
   final playerService = await PlayerService().init();
   Get.put<PlayerService>(playerService);
 
-  final pluginService = await PluginService().init();
+  final pluginService = PluginService();
   Get.put<PluginService>(pluginService);
+  pluginService.init();
 
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
     final trayService = await TrayService().init();
