@@ -1,9 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../services/plugin_service.dart';
 
 class PluginsController extends GetxController {
   final RxBool busy = false.obs;
-  final RxString log = ''.obs;
 
   late final PluginService service = Get.find();
 
@@ -12,44 +12,90 @@ class PluginsController extends GetxController {
   RxList<Map<String, dynamic>> get loadedPlugins => service.loadedPlugins;
   RxInt get activeIndex => service.activeIndex;
 
-  @override
-  void onInit() {
-    super.onInit();
-    // 当引擎就绪后，监听其事件到本地日志
-    ever<bool>(service.ready, (isReady) {
-      if (isReady) {
-        final eng = service.engine;
-        eng?.events.listen((evt) {
-          log.value = '[event] ${evt.name}: ${evt.data}';
-        });
-      }
-    });
-  }
-
-  Future<void> sendRequestSample() async {
-    if (!ready.value) {
-      log.value = '引擎未就绪';
-      return;
-    }
+  Future<void> importFromFile() async {
+    // Show a non-dismissable loading dialog until import/init completes.
     busy.value = true;
+    bool dialogShown = false;
     try {
-      final res = await service.request(
-        source: 'kw',
-        action: 'lyric',
-        info: {
-          'musicInfo': {'songmid': 'test', 'name': 'song'},
-        },
+      dialogShown = true;
+      // Use a standard, dismissible dialog so the user can cancel if desired.
+      Get.dialog(
+        AlertDialog(
+          content: Row(
+            children: const [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(),
+              ),
+              SizedBox(width: 16),
+              Expanded(child: Text('正在导入并初始化插件，请稍候...')),
+            ],
+          ),
+        ),
+        barrierDismissible: true,
       );
-      log.value = '请求返回: $res';
+
+      final res = await service.importFromFile();
+      Get.log(res.toString());
+      // Close the loading dialog if it's still visible
+      if (dialogShown) {
+        try {
+          Get.back();
+        } catch (_) {}
+        dialogShown = false;
+      }
+
+      if (res == null) {
+        // user cancelled the file picker; show a simple cancelled dialog
+        await Get.dialog(
+          AlertDialog(
+            title: const Text('导入已取消'),
+            content: const Text('用户取消了插件导入。'),
+            actions: [
+              TextButton(onPressed: () => Get.back(), child: const Text('确定')),
+            ],
+          ),
+        );
+      } else {
+        // success — show result dialog
+        await Get.dialog(
+          AlertDialog(
+            title: const Text('导入成功'),
+            content: const Text('插件已导入并初始化。'),
+            actions: [
+              TextButton(onPressed: () => Get.back(), child: const Text('确定')),
+            ],
+          ),
+        );
+      }
     } catch (e) {
-      log.value = '调用失败: $e';
+      // Ensure loading dialog is closed before showing error
+      if (dialogShown) {
+        try {
+          Get.back();
+        } catch (_) {}
+        dialogShown = false;
+      }
+      await Get.dialog(
+        AlertDialog(
+          title: const Text('导入失败'),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(onPressed: () => Get.back(), child: const Text('确定')),
+          ],
+        ),
+      );
     } finally {
       busy.value = false;
+      if (dialogShown) {
+        try {
+          Get.back();
+        } catch (_) {}
+      }
     }
   }
 
-  Future<void> importFromFile() => service.importFromFile();
-  Future<void> importFromAsset(String asset) => service.importFromAsset(asset);
   void removeAt(int index) => service.removeAt(index);
   void reorder(int oldIndex, int newIndex) =>
       service.reorder(oldIndex, newIndex);
@@ -57,8 +103,6 @@ class PluginsController extends GetxController {
     busy.value = true;
     try {
       await service.activate(index);
-    } catch (e) {
-      log.value = '激活插件失败: $e';
     } finally {
       busy.value = false;
     }
