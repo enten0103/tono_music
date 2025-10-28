@@ -66,11 +66,11 @@ class FavoritePlaylist {
   );
 }
 
-class FavoriteController extends GetxController {
+class FavoriteController extends GetxService {
   static const _storageKey = 'favorites_v1';
 
-  // Multiple playlists; index 0 is the selected playlist for UI by default
   final RxList<FavoritePlaylist> playlists = <FavoritePlaylist>[].obs;
+
   final RxInt selectedIndex = 0.obs;
 
   SharedPreferences? _prefs;
@@ -98,7 +98,7 @@ class FavoriteController extends GetxController {
         );
       } catch (_) {}
     }
-    // Ensure default playlist exists
+
     if (playlists.isEmpty || !playlists.any((p) => p.id == 'default')) {
       playlists.insert(
         0,
@@ -109,12 +109,11 @@ class FavoriteController extends GetxController {
   }
 
   Future<void> _save() async {
-    if (_prefs == null) _prefs = await SharedPreferences.getInstance();
+    _prefs ??= await SharedPreferences.getInstance();
     final s = json.encode(playlists.map((p) => p.toJson()).toList());
     await _prefs?.setString(_storageKey, s);
   }
 
-  // Backwards-compatible contains: checks default playlist (我的收藏)
   bool contains(String id, String source) {
     final def = _findPlaylistById('default');
     if (def == null) return false;
@@ -193,14 +192,12 @@ class FavoriteController extends GetxController {
     return null;
   }
 
-  // Create a new playlist
   Future<void> createPlaylist(String name) async {
     final id = DateTime.now().microsecondsSinceEpoch.toString();
     playlists.add(FavoritePlaylist(id: id, name: name, items: []));
     await _save();
   }
 
-  /// Create a new playlist with initial items and return the new playlist id.
   Future<String> createPlaylistWithItems(
     String name,
     List<FavoriteItem> initialItems,
@@ -217,7 +214,6 @@ class FavoriteController extends GetxController {
     return id;
   }
 
-  // Remove an empty playlist (don't allow removing default)
   Future<void> removePlaylist(String playlistId) async {
     if (playlistId == 'default') return;
     playlists.removeWhere((p) => p.id == playlistId);
@@ -225,7 +221,6 @@ class FavoriteController extends GetxController {
     await _save();
   }
 
-  // Rename a playlist by id
   Future<void> renamePlaylist(String playlistId, String newName) async {
     final p = _findPlaylistById(playlistId);
     if (p == null) return;

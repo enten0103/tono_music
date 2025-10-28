@@ -71,9 +71,8 @@ class PluginService extends GetxService {
 
   Future<InitedPayload?> importFromFile() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['js'],
-      withData: false,
+      type: FileType.any,
+      allowMultiple: false,
     );
     if (result == null || result.files.isEmpty) {
       return null;
