@@ -7,11 +7,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/plugin_engine.dart';
+import '../../core/plugin_engine_client.dart';
 import '../../core/models/plugin_models.dart';
 
 class PluginService extends GetxService {
   PluginEngine? engine;
-  SharedPreferences? _prefs;
+  late PluginEngineClient client;
+  late SharedPreferences prefs;
   final RxBool ready = false.obs;
   final RxMap<String, dynamic> currentScriptInfo = <String, dynamic>{}.obs;
   final RxList<Map<String, dynamic>> loadedPlugins =
@@ -25,23 +27,27 @@ class PluginService extends GetxService {
   final RxMap<String, SourceSpec> sources = <String, SourceSpec>{}.obs;
 
   Future<PluginService> init() async {
-    // 初始化插件引擎
-    engine = await PluginEngine.create();
-    _prefs = await SharedPreferences.getInstance();
+    try {
+      client = PluginEngineClient();
+      await client.start();
+    } catch (e) {
+      Get.log('Failed to start engine isolate: $e', isError: true);
+      rethrow;
+    }
+    prefs = await SharedPreferences.getInstance();
     await _restoreState();
-    // 自动加载被激活的插件
     await _autoloadActiveOnStart();
     ready.value = true;
     return this;
   }
 
   Future<InitedPayload> loadAsset(String assetPath) async {
-    final eng = engine;
-    if (eng == null) throw Exception('engine not ready');
-    await eng.reset();
+    await client.reset();
     final script = await rootBundle.loadString(assetPath);
-    final inited = await eng.loadScript(script, sourceUrl: assetPath);
-    var info = eng.getCurrentScriptInfo();
+    final inited = await client.loadScript(script, sourceUrl: assetPath);
+    var info =
+        (await client.getCurrentScriptInfo(includeRaw: false)) ??
+        <String, dynamic>{};
     // 缓存脚本到本地并更新 sourceUrl
     final cached = await _cacheScriptToLocal(script: script, info: info);
     if (cached != null) {
@@ -49,17 +55,13 @@ class PluginService extends GetxService {
       info['sourceUrl'] = cached;
     }
     currentScriptInfo.assignAll(info);
-    // 更新当前 source/type 选择
     final payload = InitedPayload.fromJson(inited);
     _updateSelectionFromInited(payload);
-    // 可以根据 inited.sources 做额外处理（此处先保留）
-    // 记录到已加载列表（以 name 唯一）
     final name = info['name'];
     if (name != null) {
       final idx = loadedPlugins.indexWhere((e) => e['name'] == name);
       if (idx >= 0) {
         loadedPlugins[idx] = info;
-        // 触发更新
         loadedPlugins.refresh();
       } else {
         loadedPlugins.add(info);
@@ -90,11 +92,12 @@ class PluginService extends GetxService {
     String script, {
     required String sourceUrl,
   }) async {
-    final eng = engine;
-    if (eng == null) throw Exception('engine not ready');
-    await eng.reset();
-    final inited = await eng.loadScript(script, sourceUrl: sourceUrl);
-    var info = eng.getCurrentScriptInfo()..['sourceUrl'] = sourceUrl;
+    await client.reset();
+    final inited = await client.loadScript(script, sourceUrl: sourceUrl);
+    var info =
+        (await client.getCurrentScriptInfo(includeRaw: true)) ??
+        <String, dynamic>{};
+    info['sourceUrl'] = sourceUrl;
     // 缓存脚本到本地并更新 sourceUrl
     final cached = await _cacheScriptToLocal(script: script, info: info);
     if (cached != null) {
@@ -127,12 +130,6 @@ class PluginService extends GetxService {
     return _loadScriptWithInfo(script, sourceUrl: assetPath);
   }
 
-  Map<String, dynamic> getcurrentScriptInfo({bool includeRaw = false}) {
-    final eng = engine;
-    if (eng == null) return {};
-    return eng.getCurrentScriptInfo(includeRaw: includeRaw);
-  }
-
   Future<void> activate(int index) async {
     if (index < 0 || index >= loadedPlugins.length) {
       return;
@@ -142,13 +139,8 @@ class PluginService extends GetxService {
     activeIndex.value = index;
     // Persist early so UI reflects selection immediately
     await _persistState();
-
-    // If there is a sourceUrl, attempt to (re)load the script into the engine
-    final eng = engine;
-    if (eng == null) return;
-
     try {
-      await eng.reset();
+      await client.reset();
       String? script;
       if (sourceUrl.startsWith('assets/')) {
         script = await rootBundle.loadString(sourceUrl);
@@ -157,18 +149,19 @@ class PluginService extends GetxService {
         if (await f.exists()) script = await f.readAsString();
       }
       if (script != null) {
-        final inited = await eng.loadScript(script, sourceUrl: sourceUrl);
-        currentScriptInfo.assignAll(eng.getCurrentScriptInfo());
+        final inited = await client.loadScript(script, sourceUrl: sourceUrl);
+        final infoMap =
+            (await client.getCurrentScriptInfo(includeRaw: false)) ??
+            <String, dynamic>{};
+        currentScriptInfo.assignAll(infoMap);
         final payload = InitedPayload.fromJson(inited);
         _updateSelectionFromInited(payload);
       } else {
-        // If no script (e.g., transient plugin), still update currentScriptInfo from stored info
         currentScriptInfo.assignAll(info);
       }
       await _persistState();
     } catch (e, st) {
       Get.log('Error activating plugin: $e\n$st', isError: true);
-      // restore currentScriptInfo to the stored info so UI remains consistent
       currentScriptInfo.assignAll(info);
     }
   }
@@ -208,26 +201,13 @@ class PluginService extends GetxService {
     _persistState();
   }
 
-  Future<dynamic> request({
-    required String source,
-    required String action,
-    required Map<String, dynamic> info,
-  }) async {
-    final eng = engine;
-    if (eng == null) throw Exception('engine not ready');
-    return eng.request(source: source, action: action, info: info);
-  }
-
   /// 按给定 source 依序尝试音质，获取歌曲 URL。
   Future<String> getMusicUrlForSource({
     required String source,
     required Map<String, dynamic> musicInfo,
   }) async {
-    final eng = engine;
-    if (eng == null) throw Exception('engine not ready');
     final spec = sources[source];
     final qualitys = spec?.qualitys ?? <String>[];
-
     final List<String> candidates = [];
     final start = selectedType.value.trim();
     if (start.isNotEmpty && qualitys.contains(start)) {
@@ -236,26 +216,18 @@ class PluginService extends GetxService {
         if (quality != start) candidates.add(quality);
       }
     } else if (qualitys.isNotEmpty) {
-      for (final quality in qualitys) {
-        candidates.add(quality);
-      }
+      candidates.addAll(qualitys);
     }
-    Object? lastError;
-    for (final candidate in candidates) {
-      try {
-        final url = await eng.getMusicUrl(
-          source: source,
-          type: candidate,
-          musicInfo: musicInfo,
-        );
-        return url;
-      } catch (e) {
-        lastError = e;
-      }
-    }
-    final tried = candidates.map((e) => e).join(',');
+
+    final res = await client.getMusicUrlForSource(
+      source,
+      candidates,
+      musicInfo,
+      timeout: const Duration(seconds: 30),
+    );
+    if (res != null && res.isNotEmpty) return res;
     throw Exception(
-      'getMusicUrlForSource failed for source=$source, tried types=[$tried], lastError=$lastError',
+      'getMusicUrlForSource failed for source=$source (no url returned)',
     );
   }
 
@@ -299,7 +271,7 @@ class PluginService extends GetxService {
   // 持久化当前插件列表、激活项以及选择的 source/type
   Future<void> _persistState() async {
     try {
-      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      final prefs = this.prefs;
       final state = <String, dynamic>{
         'loadedPlugins': loadedPlugins.toList(),
         'activeIndex': activeIndex.value,
@@ -312,7 +284,6 @@ class PluginService extends GetxService {
 
   Future<void> _restoreState() async {
     try {
-      final prefs = _prefs ?? await SharedPreferences.getInstance();
       final raw = prefs.getString('plugin_state_v1');
       if (raw == null || raw.isEmpty) return;
       final map = jsonDecode(raw);
@@ -351,12 +322,13 @@ class PluginService extends GetxService {
       }
     } catch (_) {}
     if (script == null) return;
-    final eng = engine;
-    if (eng == null) return;
     try {
-      await eng.reset();
-      final inited = await eng.loadScript(script, sourceUrl: sourceUrl);
-      currentScriptInfo.assignAll(eng.getCurrentScriptInfo());
+      await client.reset();
+      final inited = await client.loadScript(script, sourceUrl: sourceUrl);
+      final infoMap =
+          (await client.getCurrentScriptInfo(includeRaw: false)) ??
+          <String, dynamic>{};
+      currentScriptInfo.assignAll(infoMap);
       final payload = InitedPayload.fromJson(inited);
       _updateSelectionFromInited(payload);
     } catch (e) {
@@ -367,7 +339,9 @@ class PluginService extends GetxService {
 
   @override
   void onClose() {
-    engine?.dispose();
+    try {
+      client.stop();
+    } catch (_) {}
     super.onClose();
   }
 

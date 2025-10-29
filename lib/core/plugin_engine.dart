@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_js/extensions/xhr.dart';
 import 'package:flutter_js/flutter_js.dart';
-import 'package:flutter_js/extensions/fetch.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:get/get.dart';
+import 'package:tono_music/core/bridge_js.dart';
+import 'package:tono_music/core/crypto_js.dart';
 
 /// JS 插件引擎：基于 flutter_js 将，globalThis.lx 注入到 JS 运行时中。
 ///
@@ -58,9 +59,9 @@ class PluginEngine {
   }
 
   Future<void> _initRuntime() async {
-    runtime = getJavascriptRuntime();
+    runtime = getJavascriptRuntime(xhr: false);
     runtime.enableHandlePromises();
-    await runtime.enableFetch();
+    runtime.enableXhr();
   }
 
   /// 重置运行时：用于在导入新脚本前清理环境，避免重复声明
@@ -104,7 +105,6 @@ class PluginEngine {
 
   /// 释放资源
   void dispose() {
-    // 停止 pending 循环并释放运行时
     try {
       endPending();
     } catch (_) {}
@@ -177,8 +177,6 @@ class PluginEngine {
     return data;
   }
 
-  /// 便捷方法：调用插件中的 musicUrl 能力，返回歌曲 URL。
-  /// 当 source 为 local 时，可传入 type = null。
   Future<String> getMusicUrl({
     required String source,
     String? type,
@@ -197,17 +195,14 @@ class PluginEngine {
   }
 
   Future<void> _installCryptoObject() async {
-    // 读取 assets/crypto-js.js 并注入
-    final js = await rootBundle.loadString('assets/crypto-js.js');
-    final result = runtime.evaluate(js, sourceUrl: 'crypto-js.js');
+    final result = runtime.evaluate(CRYPTO, sourceUrl: 'crypto-js.js');
     if (result.isError) {}
   }
 
   //加载lx对象
   Future<void> _installLxObject(String headerJson) async {
     // 读取 assets/lx_bridge.js 并替换占位符为实际 header JSON
-    final tpl = await rootBundle.loadString('assets/lx_bridge.js');
-    final js = tpl.replaceAll('__HEADER_JSON__', headerJson);
+    final js = BRIDGE.replaceAll('__HEADER_JSON__', headerJson);
     runtime.evaluate(js, sourceUrl: 'lx_bridge.js');
   }
 
