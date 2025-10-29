@@ -70,7 +70,6 @@ class PlayerService extends GetxService {
   }
 
   Future<void> setUrl(String url) async {
-    Get.log('播放地址: $url');
     try {
       await _player.open(Media(url), play: false);
       state.value = PlayerState.ready;
@@ -89,9 +88,10 @@ class PlayerService extends GetxService {
   }) {
     if (title != null) currentTitle.value = title;
     if (cover != null) currentCover.value = cover;
-    if (id != null) currentSongId.value = id;
     if (source != null) currentSource.value = source;
     if (artists != null) this.artists.assignAll(artists);
+    //最后更新id
+    if (id != null) currentSongId.value = id;
   }
 
   void setLyricLine(String text) {
@@ -225,6 +225,7 @@ class PlayerService extends GetxService {
     await seek(Duration.zero);
     currentIndex.value = idx;
     clearLyrics();
+    print(item.artists);
     setMetadata(
       title: item.name,
       cover: item.coverUrl,
