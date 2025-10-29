@@ -29,6 +29,16 @@ class _LyricListState extends State<LyricList>
     return Obx(() {
       final itemCount = playerService.lyrics.length;
       final cur = playerService.currentLyricIndex.value;
+      final state = playerService.state.value;
+
+      if (state == PlayerState.loading) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      if (state == PlayerState.error) {
+        return const Center(child: Text('加载失败'));
+      }
+
       if (itemCount == 0) {
         return const Center(child: Text('暂无歌词'));
       }

@@ -6,6 +6,8 @@ import 'package:media_kit/media_kit.dart';
 import 'package:music_sdk/music_sdk.dart';
 import 'plugin_service.dart';
 
+enum PlayerState { ready, loading, error }
+
 @pragma("vm:entry-point")
 class PlayerService extends GetxService {
   final Player _player = Player();
@@ -38,16 +40,12 @@ class PlayerService extends GetxService {
   final RxList<LyricPoint> lyrics = <LyricPoint>[].obs;
   int _lastLyricIndex = -1;
 
-  bool isFetching = false;
+  final Rx<PlayerState> state = Rx<PlayerState>(PlayerState.ready);
 
   Future<PlayerService> init() async {
-    try {
-      if (!Platform.isWindows) {
-        final session = await AudioSession.instance;
-        await session.configure(const AudioSessionConfiguration.music());
-      }
-    } catch (_) {
-      // 某些平台上可能没有实现，忽略以不影响播放
+    if (!Platform.isWindows) {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
     }
 
     _player.stream.playing.listen((state) {
@@ -75,7 +73,11 @@ class PlayerService extends GetxService {
     Get.log('播放地址: $url');
     try {
       await _player.open(Media(url), play: false);
-    } catch (_) {}
+      state.value = PlayerState.ready;
+    } catch (_) {
+      state.value = PlayerState.error;
+      return;
+    }
   }
 
   void setMetadata({
@@ -97,8 +99,14 @@ class PlayerService extends GetxService {
   }
 
   Future<void> play() async {
-    if (isFetching) return;
-    _player.play();
+    if (state.value == PlayerState.loading) return;
+    if (state.value == PlayerState.error) {
+      if (queue.isEmpty) return;
+      final idx = currentIndex.value;
+      _playByIndex(idx);
+    } else {
+      _player.play();
+    }
   }
 
   Future<void> pause() => _player.pause();
@@ -216,7 +224,7 @@ class PlayerService extends GetxService {
     await _player.pause();
     await seek(Duration.zero);
     currentIndex.value = idx;
-
+    clearLyrics();
     setMetadata(
       title: item.name,
       cover: item.coverUrl,
@@ -228,16 +236,16 @@ class PlayerService extends GetxService {
     try {
       final plugin = Get.find<PluginService>();
       currentLyricLine.value = '正在获取播放地址...';
-      isFetching = true;
+      state.value = PlayerState.loading;
       final url = await plugin.getMusicUrlForSource(
         source: item.source,
         musicInfo: {'songmid': item.id, 'source': item.source},
       );
-      isFetching = false;
+      state.value = PlayerState.ready;
       currentLyricLine.value = '获取播放地址成功';
       await setUrl(url);
     } catch (e) {
-      isFetching = false;
+      state.value = PlayerState.error;
       currentLyricLine.value = '获取播放地址失败';
       return;
     }

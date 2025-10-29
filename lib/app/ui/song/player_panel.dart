@@ -114,6 +114,7 @@ class PlayerPanel extends GetView<PlayerService> {
           final pos = controller.position.value;
           final dur = controller.duration.value ?? Duration.zero;
           final total = dur.inMilliseconds.clamp(1, 1 << 62);
+          final state = controller.state.value;
           final v = pos.inMilliseconds / total;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -133,10 +134,18 @@ class PlayerPanel extends GetView<PlayerService> {
                       },
                     ),
                   ),
-                  SizedBox(
-                    width: 42,
-                    child: Text(_fmt(dur), textAlign: TextAlign.right),
-                  ),
+                  state == PlayerState.loading
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : state == PlayerState.error
+                      ? SizedBox(width: 42, height: 16, child: Text('00:00'))
+                      : SizedBox(
+                          width: 42,
+                          child: Text(_fmt(dur), textAlign: TextAlign.right),
+                        ),
                 ],
               ),
             ],
