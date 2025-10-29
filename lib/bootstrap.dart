@@ -12,6 +12,7 @@ import 'package:tono_music/app/services/plugin_service.dart';
 import 'package:tono_music/app/services/tray_service.dart';
 import 'package:tono_music/app/services/smtc_service.dart';
 import 'package:tono_music/app/services/lyrics_overlay_controller.dart';
+import 'package:tono_music/config.dart';
 import 'package:window_manager/window_manager.dart';
 
 Future<void> bootstrap() async {
@@ -21,6 +22,7 @@ Future<void> bootstrap() async {
     await SMTCWindows.initialize();
   }
   await initWindow();
+
   await initImageCache();
 
   await initDependencies();
@@ -40,9 +42,10 @@ Future<void> initDependencies() async {
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
     final trayService = await TrayService().init();
     Get.put<TrayService>(trayService);
-    // Lyrics overlay controller (desktop overlay for lyrics)
     final lyricsController = await LyricsOverlayController().init();
     Get.put<LyricsOverlayController>(lyricsController);
+    final appConfig = await AppConfig().init();
+    Get.put<AppConfig>(appConfig);
   }
   if (Platform.isAndroid) {
     final notificationService = await NotificationService().init();

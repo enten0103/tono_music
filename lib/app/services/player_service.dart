@@ -225,7 +225,6 @@ class PlayerService extends GetxService {
     await seek(Duration.zero);
     currentIndex.value = idx;
     clearLyrics();
-    print(item.artists);
     setMetadata(
       title: item.name,
       cover: item.coverUrl,

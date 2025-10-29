@@ -31,6 +31,7 @@ dependencies:
   media_kit: ^1.2.1
   media_kit_libs_audio: ^1.0.7
   tray_manager: ^0.5.1
+  system_fonts: ^1.0.1
 
 dev_dependencies:
   flutter_test:
@@ -41,7 +42,3 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
-  fonts:
-    - family: OppoSans
-      fonts:
-        - asset: assets/OPPO Sans 4.0.ttf

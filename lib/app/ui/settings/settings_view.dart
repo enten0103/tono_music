@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/app/routes/app_routes.dart';
@@ -389,6 +391,55 @@ class SettingsView extends GetView<SettingsController> {
           ],
         ),
         const Divider(),
+        // 全局字体选择
+        if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '界面字体（全局）',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Obx(() {
+                    final list = controller.systemFonts;
+                    final value = controller.globalFontFamily.value;
+                    return Row(
+                      children: [
+                        const Text('字体：'),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: list.contains(value)
+                                ? value
+                                : (list.isNotEmpty ? list.first : value),
+                            items: list
+                                .map(
+                                  (f) => DropdownMenuItem(
+                                    value: f,
+                                    child: Text(f),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) controller.setGlobalFontFamily(v);
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                  const SizedBox(height: 6),
+                  const Text('选择字体（重启后生效）。'),
+                ],
+              ),
+            ),
+          ),
         // 图片缓存设置
         ListTile(
           leading: const Icon(Icons.image_outlined),

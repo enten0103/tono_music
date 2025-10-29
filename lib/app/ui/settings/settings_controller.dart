@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
 import 'package:tono_music/app/services/lyrics_overlay_service.dart';
+import 'package:system_fonts/system_fonts.dart';
 
 class SettingsController extends GetxController {
   final RxBool darkMode = false.obs;
@@ -17,20 +18,75 @@ class SettingsController extends GetxController {
   // Lyrics overlay settings
   final RxBool overlayEnabled = false.obs;
   final RxBool overlayClickThrough = false.obs;
-  final RxInt overlayFontSize = 20.obs; // points
-  final RxInt overlayBgOpacity = 200.obs; // 0-255
+  final RxInt overlayFontSize = 20.obs;
+  final RxInt overlayBgOpacity = 200.obs;
   final RxString overlayFontFamily = 'Segoe UI'.obs;
   final RxBool overlayFontBold = false.obs;
-  // text color as 0xRRGGBB
   final RxInt overlayTextColor = 0xFFFFFF.obs;
+  // 全局字体设置
+  final RxString globalFontFamily = 'Segoe UI'.obs;
+  // 系统字体列表
+  final RxList<String> systemFonts = <String>[].obs;
 
   @override
   void onInit() {
     super.onInit();
     _loadImageCache();
     _loadOverlaySettings();
+    _loadGlobalFontSetting();
+    loadSystemFonts();
     updateImageCacheUsage();
     _startCacheMonitor();
+  }
+
+  Future<void> _loadGlobalFontSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    globalFontFamily.value = prefs.getString('globalFontFamily') ?? 'Segoe UI';
+    // 尝试提前加载已选择的全局字体（桌面平台）
+    try {
+      final name = globalFontFamily.value;
+      if (name.isNotEmpty) {
+        await SystemFonts().loadFont(name);
+      }
+    } catch (_) {}
+  }
+
+  /// 在常见平台上枚举系统字体文件名并填充到 systemFonts
+  Future<void> loadSystemFonts() async {
+    // 使用 system_fonts 包枚举已安装字体名（同步返回列表）
+    try {
+      final list = SystemFonts().getFontList();
+      if (list.isNotEmpty) {
+        final fallback = [
+          'Segoe UI',
+          'Arial',
+          'Microsoft YaHei',
+          'SimSun',
+          'Times New Roman',
+          'OppoSans',
+        ];
+        systemFonts.value = [
+          ...{...list},
+          ...fallback,
+        ];
+        return;
+      }
+    } catch (_) {
+      // ignore and fallback to directory scan
+    }
+  }
+
+  Future<void> setGlobalFontFamily(String family) async {
+    globalFontFamily.value = family;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('globalFontFamily', family);
+    // 尝试加载该字体文件到 Flutter（仅当字体存在于系统时）
+    try {
+      final loaded = await SystemFonts().loadFont(family);
+      if (loaded == null) {
+        // 未能加载，不做额外处理，用户可以选择其它字体
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadOverlaySettings() async {

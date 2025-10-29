@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/bootstrap.dart';
+import 'package:tono_music/config.dart';
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 
@@ -20,7 +23,9 @@ class App extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
-        fontFamily: 'OppoSans',
+        fontFamily: Platform.isWindows | Platform.isMacOS | Platform.isLinux
+            ? Get.find<AppConfig>().globalFontFamily.value
+            : null,
       ),
       initialRoute: AppRoutes.home,
       getPages: AppPages.routes,
