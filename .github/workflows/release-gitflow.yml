@@ -1,0 +1,190 @@
+name: Release All (GitFlow)
+
+on:
+  push:
+    branches: [ 'release/*', 'hotfix/*' ]
+    tags:     [ 'v*.*.*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compute:
+    name: Compute version & changelog
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      changelog: ${{ steps.meta.outputs.changelog }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: meta
+        shell: bash
+        run: |
+          set -e
+          ref="${GITHUB_REF}"
+          ref_name="${GITHUB_REF_NAME}"
+
+          if [[ "$ref" == refs/tags/v* ]]; then
+            # 正式发布
+            version="${ref_name#v}"
+            tag="$ref_name"
+            prerelease="false"
+            range_target="$tag"
+          else
+            # 预发布（release/* 或 hotfix/*）
+            if [[ "$ref" == refs/heads/release/* ]]; then
+              version="${ref_name#release/}"
+            elif [[ "$ref" == refs/heads/hotfix/* ]]; then
+              version="${ref_name#hotfix/}"
+            else
+              echo "Unsupported ref: $ref"
+              exit 1
+            fi
+            tag="v${version}-rc.${GITHUB_RUN_NUMBER}"
+            prerelease="true"
+            range_target="HEAD"
+          fi
+
+          # 计算 changelog 范围（优先取上一个 v* tag）
+          if git describe --tags --abbrev=0 --match 'v[0-9]*' >/dev/null 2>&1; then
+            prev_tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
+          else
+            prev_tag="$(git rev-list --max-parents=0 HEAD | tail -n1)"
+          fi
+
+          if [[ "$ref" == refs/tags/v* ]]; then
+            range="${prev_tag}..${tag}"
+          else
+            range="${prev_tag}..${range_target}"
+          fi
+
+          echo "version=$version"       >> $GITHUB_OUTPUT
+          echo "tag=$tag"               >> $GITHUB_OUTPUT
+          echo "prerelease=$prerelease" >> $GITHUB_OUTPUT
+
+          log="$(git log --pretty=format:'- %s (%h) — %an' $range || true)"
+          log="${log:-No changes.}"
+          {
+            echo 'changelog<<EOF'
+            echo "$log"
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+  android:
+    name: Build Android APKs (per-ABI)
+    needs: compute
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses >/dev/null 2>&1 || true
+      - name: Install SDK packages
+        run: sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - name: Flutter pub get
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Prepare signing (if secrets provided)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 && secrets.ANDROID_KEY_ALIAS && secrets.ANDROID_KEY_PASSWORD && secrets.ANDROID_STORE_PASSWORD }}
+        shell: bash
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+          printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n" \
+            "${{ secrets.ANDROID_STORE_PASSWORD }}" \
+            "${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            "${{ secrets.ANDROID_KEY_ALIAS }}" > android/key.properties
+
+      - name: Build APK (split per ABI)
+        env:
+          VERSION: ${{ needs.compute.outputs.version }}
+        run: |
+          flutter build apk --release --split-per-abi --build-name "$VERSION" --build-number "${GITHUB_RUN_NUMBER}"
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ needs.compute.outputs.tag }}
+          path: build/app/outputs/flutter-apk/*-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Build Windows Installer
+    needs: compute
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+        shell: pwsh
+      - name: Flutter pub get
+        run: flutter pub get
+        shell: pwsh
+      - name: Analyze
+        run: flutter analyze
+        shell: pwsh
+      - name: Build Windows (Release)
+        run: flutter build windows --release
+        shell: pwsh
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+        shell: pwsh
+      - name: Build installer
+        env:
+          APP_VERSION: ${{ needs.compute.outputs.version }}
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\installer.iss"
+        shell: pwsh
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-${{ needs.compute.outputs.tag }}
+          path: build/installer/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Create GitHub Release
+    needs: [compute, android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Create/Upload GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.compute.outputs.tag }}
+          name: ${{ needs.compute.outputs.tag }}
+          body: ${{ needs.compute.outputs.changelog }}
+          prerelease: ${{ needs.compute.outputs.prerelease }}
+          files: |
+            dist/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,6 +2,20 @@
 
 TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_js项目实现了一个最小的LxMusic插件运行时。
 
+# Preivew
+
+<center>
+  <table>
+    <tr>
+      <td><img src="./docs/preview/square.png"></td>
+      <td><img src="./docs/preview/song.png"></td>
+      <td><img src="./docs/preview/playlist.png"></td>
+      <td><img src="./docs/preview/plugin_setting.png"></td>
+    </tr>
+  </table>
+</center>
+
+
 # Features
 
 音源

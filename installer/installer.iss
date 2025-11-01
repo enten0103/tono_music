@@ -2,7 +2,13 @@
 ; Requires: Inno Setup 6 (Unicode)
 
 #define AppName "TonoMusic"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+	#if GetEnv("APP_VERSION") != ""
+		#define AppVersion GetEnv("APP_VERSION")
+	#else
+		#define AppVersion "1.0.0"
+	#endif
+#endif
 #define AppExe "tono_music.exe"
 #define AppIdGuid "9F5A6C72-3B1D-4E8C-8D9C-1F2A3B4C5D6E" ; Reserved for reference
 
