@@ -39,7 +39,6 @@ class PlaylistDetailController extends GetxController {
 
   Future<void> _load() async {
     if (playlistId.isEmpty) return;
-    // 取消旧订阅，准备重新加载
     await _tracksSub?.cancel();
     _tracksSub = null;
 

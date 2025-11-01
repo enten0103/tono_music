@@ -21,79 +21,89 @@ class PlaylistDetailView extends GetView<PlaylistDetailController> {
           ),
         ),
         actions: [
-          IconButton(
-            tooltip: '收藏',
-            icon: const Icon(Icons.favorite_outline),
-            onPressed: () async {
-              // Ask for a name for the new favorite playlist
-              final defaultName = controller.title.value.isEmpty
-                  ? '新收藏歌单'
-                  : controller.title.value;
-              final name = await showDialog<String?>(
-                context: context,
-                builder: (ctx) {
-                  final ctrl = TextEditingController(text: defaultName);
-                  return AlertDialog(
-                    title: const Text('收藏为'),
-                    content: TextField(
-                      controller: ctrl,
-                      decoration: const InputDecoration(hintText: '新歌单名称'),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('取消'),
-                      ),
-                      TextButton(
-                        onPressed: () =>
-                            Navigator.of(ctx).pop(ctrl.text.trim()),
-                        child: const Text('创建'),
-                      ),
-                    ],
-                  );
-                },
-              );
-              if (name == null || name.isEmpty) return;
+          Obx(
+            () => (controller.loading.value || controller.streaming.value)
+                ? const SizedBox.shrink()
+                : IconButton(
+                    tooltip: '收藏',
+                    icon: const Icon(Icons.favorite_outline),
+                    onPressed: () async {
+                      // Ask for a name for the new favorite playlist
+                      final defaultName = controller.title.value.isEmpty
+                          ? '新收藏歌单'
+                          : controller.title.value;
+                      final name = await showDialog<String?>(
+                        context: context,
+                        builder: (ctx) {
+                          final ctrl = TextEditingController(text: defaultName);
+                          return AlertDialog(
+                            title: const Text('收藏为'),
+                            content: TextField(
+                              controller: ctrl,
+                              decoration: const InputDecoration(
+                                hintText: '新歌单名称',
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(),
+                                child: const Text('取消'),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(ctx).pop(ctrl.text.trim()),
+                                child: const Text('创建'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                      if (name == null || name.isEmpty) return;
 
-              final favCtrl = Get.find<FavoriteController>();
-              // convert tracks to FavoriteItem
-              final items = controller.tracks
-                  .map(
-                    (song) => FavoriteItem(
-                      id: song.id,
-                      source: controller.source,
-                      title: song.name,
-                      coverUrl: song.picUrl,
-                      artists: song.artists,
-                    ),
-                  )
-                  .toList();
+                      final favCtrl = Get.find<FavoriteController>();
+                      // convert tracks to FavoriteItem
+                      final items = controller.tracks
+                          .map(
+                            (song) => FavoriteItem(
+                              id: song.id,
+                              source: controller.source,
+                              title: song.name,
+                              coverUrl: song.picUrl,
+                              artists: song.artists,
+                            ),
+                          )
+                          .toList();
 
-              try {
-                await favCtrl.createPlaylistWithItems(name, items);
-                Get.snackbar(
-                  '已收藏',
-                  '已将歌单复制为收藏：$name',
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-                // Optionally navigate to favorites tab
-              } catch (e) {
-                Get.dialog(
-                  AlertDialog(
-                    title: const Text('错误'),
-                    content: Text(e.toString()),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Get.back(),
-                        child: const Text('确定'),
-                      ),
-                    ],
+                      try {
+                        await favCtrl.createPlaylistWithItems(name, items);
+                        Get.snackbar(
+                          '已收藏',
+                          '已将歌单复制为收藏：$name',
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
+                        // Optionally navigate to favorites tab
+                      } catch (e) {
+                        Get.dialog(
+                          AlertDialog(
+                            title: const Text('错误'),
+                            content: Text(e.toString()),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Get.back(),
+                                child: const Text('确定'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    },
                   ),
-                );
-              }
-            },
           ),
-          SizedBox(width: 12),
+          Obx(
+            () => (controller.loading.value || controller.streaming.value)
+                ? const SizedBox.shrink()
+                : const SizedBox(width: 12),
+          ),
         ],
         flexibleSpace: const DragToMoveArea(child: SizedBox.expand()),
       ),
