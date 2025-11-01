@@ -23,13 +23,14 @@ class App extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
-        fontFamily: Platform.isWindows | Platform.isMacOS | Platform.isLinux
+        fontFamily: Platform.isWindows || Platform.isMacOS || Platform.isLinux
             ? Get.find<AppConfig>().globalFontFamily.value
             : null,
       ),
       initialRoute: AppRoutes.home,
       getPages: AppPages.routes,
       defaultTransition: Transition.cupertino,
+      // Back press handling is implemented in RootView via WillPopScope.
     );
   }
 }
