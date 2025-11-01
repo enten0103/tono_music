@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:flutter/painting.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import 'package:tono_music/app/services/url_cache_service.dart';
 
 import 'package:tono_music/app/services/lyrics_overlay_service.dart';
 import 'package:system_fonts/system_fonts.dart';
@@ -14,6 +15,10 @@ class SettingsController extends GetxController {
   final RxInt imageCacheMB = 256.obs;
   final RxInt imageCacheUsedBytes = 0.obs;
   Timer? _cacheTimer;
+
+  // URL 缓存统计
+  final RxInt urlCacheEntryCount = 0.obs;
+  final RxInt urlCacheStorageBytes = 0.obs;
 
   // Lyrics overlay settings
   final RxBool overlayEnabled = false.obs;
@@ -36,6 +41,11 @@ class SettingsController extends GetxController {
     _loadGlobalFontSetting();
     loadSystemFonts();
     updateImageCacheUsage();
+    // 异步准备 URL 缓存服务并拉取统计
+    Future.microtask(() async {
+      await _ensureUrlCacheReady();
+      await updateUrlCacheStats();
+    });
     _startCacheMonitor();
   }
 
@@ -239,6 +249,46 @@ class SettingsController extends GetxController {
   void updateImageCacheUsage() {
     final used = PaintingBinding.instance.imageCache.currentSizeBytes;
     imageCacheUsedBytes.value = used;
+  }
+
+  Future<void> _ensureUrlCacheReady() async {
+    if (!Get.isRegistered<UrlCacheService>()) {
+      await Get.putAsync(() async => await UrlCacheService().init());
+    } else {
+      final s = Get.find<UrlCacheService>();
+      if (!s.initialized) {
+        await s.init();
+      }
+    }
+  }
+
+  Future<void> updateUrlCacheStats() async {
+    try {
+      final svc = Get.find<UrlCacheService>();
+      urlCacheEntryCount.value = svc.entryCount;
+      urlCacheStorageBytes.value = await svc.storageSizeBytes();
+    } catch (_) {
+      urlCacheEntryCount.value = 0;
+      urlCacheStorageBytes.value = 0;
+    }
+  }
+
+  Future<void> clearUrlCacheAll() async {
+    try {
+      await _ensureUrlCacheReady();
+      final svc = Get.find<UrlCacheService>();
+      await svc.clearAll();
+    } catch (_) {}
+    await updateUrlCacheStats();
+  }
+
+  Future<void> clearUrlCacheExpired() async {
+    try {
+      await _ensureUrlCacheReady();
+      final svc = Get.find<UrlCacheService>();
+      await svc.clearExpired();
+    } catch (_) {}
+    await updateUrlCacheStats();
   }
 
   @override

@@ -247,8 +247,8 @@ class PlayerService extends GetxService {
     final urlCache = Get.find<UrlCacheService>();
     final plugin = Get.find<PluginService>();
 
-    // 1) 尝试使用缓存（按所选音质）
-    final desiredType = Get.find<PluginService>().selectedType.value.trim();
+    // 1) 尝试使用缓存（按该来源的偏好音质）
+    final desiredType = plugin.preferredTypeFor(item.source)?.trim() ?? '';
     final cached = (desiredType.isEmpty)
         ? null
         : await urlCache.getCachedForType(item.source, item.id, desiredType);

@@ -125,6 +125,39 @@ class UrlCacheService extends GetxService {
       await _prefs.setString(_storeKey, jsonEncode(data));
     } catch (_) {}
   }
+
+  // === 管理 & 统计 ===
+  int get entryCount => _cache.length;
+
+  /// 估算占用的存储大小（基于 JSON 字节长度）
+  Future<int> storageSizeBytes() async {
+    try {
+      final data = _cache.map((k, e) => MapEntry(k, e.toJson()));
+      final raw = jsonEncode(data);
+      return raw
+          .codeUnits
+          .length; // UTF-16 code units length; acceptable estimate
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// 清理所有 URL 缓存
+  Future<void> clearAll() async {
+    _cache.clear();
+    await _persist();
+  }
+
+  /// 清理所有已过期条目，返回删除数量
+  Future<int> clearExpired() async {
+    final before = _cache.length;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _cache.removeWhere((_, e) => e.expireAt < now);
+    if (_cache.length != before) {
+      await _persist();
+    }
+    return before - _cache.length;
+  }
 }
 
 class CachedUrl {

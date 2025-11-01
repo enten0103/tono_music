@@ -23,6 +23,8 @@ class PluginService extends GetxService {
   // 维护当前选择的 source 与 type（音质）。
   final RxString selectedSource = ''.obs;
   final RxString selectedType = 'flac'.obs; // 128k/320k/flac/flac24bit
+  // 每个来源的音质偏好：source -> type
+  final RxMap<String, String> preferredTypeBySource = <String, String>{}.obs;
   // 缓存最近一次 inited 的 sources，便于根据 source 计算默认 type
   final RxMap<String, SourceSpec> sources = <String, SourceSpec>{}.obs;
 
@@ -212,7 +214,8 @@ class PluginService extends GetxService {
     final qualitys = spec?.qualitys ?? <String>[];
 
     final List<String> candidates = [];
-    final start = selectedType.value.trim();
+    // 以“该来源的偏好音质”为起点
+    final start = (preferredTypeBySource[source] ?? selectedType.value).trim();
     final idx = qualitys.indexOf(start);
     if (idx >= 0) {
       candidates.add(qualitys[idx]);
@@ -245,18 +248,29 @@ class PluginService extends GetxService {
     selectedSource.value = source;
     final spec = sources[source];
     if (spec != null) {
-      // 若当前 type 不在此源的质量列表中，则回退为首个或空
-      if (!spec.qualitys.contains(selectedType.value)) {
-        selectedType.value = spec.qualitys.isNotEmpty
-            ? spec.qualitys.first
-            : '';
+      // 若该来源曾设置过偏好，且仍在可用列表中，则使用该偏好；
+      final pref = preferredTypeBySource[source];
+      if (pref != null && spec.qualitys.contains(pref)) {
+        selectedType.value = pref;
+      } else {
+        // 否则，如果当前选中的 type 不在列表中，则回退为首个或空
+        if (!spec.qualitys.contains(selectedType.value)) {
+          selectedType.value = spec.qualitys.isNotEmpty
+              ? spec.qualitys.first
+              : '';
+        }
       }
     }
     _persistState();
   }
 
   void setType(String type) {
-    selectedType.value = type.trim();
+    final t = type.trim();
+    selectedType.value = t;
+    final src = selectedSource.value;
+    if (src.isNotEmpty) {
+      preferredTypeBySource[src] = t;
+    }
     _persistState();
   }
 
@@ -274,7 +288,13 @@ class PluginService extends GetxService {
     final firstKey = sources.keys.first;
     selectedSource.value = firstKey;
     final q = sources[firstKey]?.qualitys ?? const <String>[];
-    selectedType.value = q.isNotEmpty ? q.first : '';
+    // 若存在为该来源保存的偏好且仍可用，优先使用偏好
+    final pref = preferredTypeBySource[firstKey];
+    if (pref != null && q.contains(pref)) {
+      selectedType.value = pref;
+    } else {
+      selectedType.value = q.isNotEmpty ? q.first : '';
+    }
   }
 
   // 持久化当前插件列表、激活项以及选择的 source/type
@@ -286,6 +306,9 @@ class PluginService extends GetxService {
         'activeIndex': activeIndex.value,
         'selectedSource': selectedSource.value,
         'selectedType': selectedType.value,
+        'preferredTypeBySource': Map<String, String>.from(
+          preferredTypeBySource,
+        ),
       };
       await prefs.setString('plugin_state_v1', jsonEncode(state));
     } catch (_) {}
@@ -308,11 +331,20 @@ class PluginService extends GetxService {
           : -1;
       selectedSource.value = (map['selectedSource']?.toString() ?? '');
       selectedType.value = (map['selectedType']?.toString() ?? '');
+      final prefMap = map['preferredTypeBySource'];
+      if (prefMap is Map) {
+        preferredTypeBySource.assignAll(
+          prefMap.map((k, v) => MapEntry(k.toString(), v.toString())),
+        );
+      }
       if (activeIndex.value >= 0 && activeIndex.value < loadedPlugins.length) {
         currentScriptInfo.assignAll(loadedPlugins[activeIndex.value]);
       }
     } catch (_) {}
   }
+
+  // 读取指定来源的偏好音质（如果存在）
+  String? preferredTypeFor(String source) => preferredTypeBySource[source];
 
   Future<void> _autoloadActiveOnStart() async {
     if (activeIndex.value < 0 || activeIndex.value >= loadedPlugins.length) {
