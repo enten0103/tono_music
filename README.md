@@ -36,6 +36,7 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
 - [ ] 榜单 
 - [x] 音乐播放
 - [x] 收藏
+- [ ] 音轨微调
 - [x] 逐句歌词
 - [ ] 逐词歌词
 - [x] 歌曲搜索
@@ -43,6 +44,7 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
 - [ ] 评论
 - [x] 歌单管理
     - [x] 歌单导入
+    - [x] 歌单订阅
 - [ ] 其它功能
 
 平台相关

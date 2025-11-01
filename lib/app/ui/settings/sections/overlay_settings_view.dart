@@ -14,6 +14,7 @@ class OverlaySettingsView extends GetView<SettingsController> {
         padding: const EdgeInsets.all(12),
         children: [
           Card(
+            elevation: 0,
             child: Padding(
               padding: const EdgeInsets.all(12.0),
               child: Column(
