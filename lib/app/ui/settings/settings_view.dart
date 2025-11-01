@@ -37,7 +37,7 @@ class SettingsView extends GetView<SettingsController> {
         _SettingsTile(
           icon: Icons.image_outlined,
           title: '缓存',
-          subtitleBuilder: () => Obx(() => Text('管理图片/URL/MUSIC缓存')),
+          subtitleBuilder: () => const Text('管理图片/URL/MUSIC缓存'),
           onTap: () => Get.toNamed(AppRoutes.settingsCache),
         ),
         if (Platform.isAndroid)

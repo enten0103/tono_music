@@ -32,6 +32,8 @@ dependencies:
   media_kit_libs_audio: ^1.0.7
   tray_manager: ^0.5.1
   system_fonts: ^1.0.1
+  cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
 
 dev_dependencies:
   flutter_test:

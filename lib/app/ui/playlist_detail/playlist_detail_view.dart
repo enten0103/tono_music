@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get/get.dart';
 import 'playlist_detail_controller.dart';
 import '../favorite/favorite_controller.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../widgets/global_mini_player.dart';
 import '../../services/player_service.dart';
+import 'package:tono_music/app/services/app_cache_manager.dart';
 
 class PlaylistDetailView extends GetView<PlaylistDetailController> {
   const PlaylistDetailView({super.key});
@@ -160,12 +162,18 @@ class PlaylistDetailView extends GetView<PlaylistDetailController> {
                             child: ListTile(
                               leading: ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
-                                child: Image.network(
-                                  song.picUrl,
+                                child: CachedNetworkImage(
+                                  imageUrl: song.picUrl,
                                   width: 48,
                                   height: 48,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const SizedBox(
+                                  cacheManager: AppCacheManager.instance,
+                                  placeholder: (_, __) => const SizedBox(
+                                    width: 48,
+                                    height: 48,
+                                    child: ColoredBox(color: Color(0xFFF5F5F5)),
+                                  ),
+                                  errorWidget: (_, __, ___) => const SizedBox(
                                     width: 48,
                                     height: 48,
                                     child: ColoredBox(color: Color(0xFFEFEFEF)),

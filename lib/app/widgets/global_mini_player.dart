@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get/get.dart';
 import '../services/player_service.dart';
 import '../routes/app_routes.dart';
 import 'queue_sheet.dart';
+import 'package:tono_music/app/services/app_cache_manager.dart';
 
 class GlobalMiniPlayer extends GetView<PlayerService> {
   const GlobalMiniPlayer({super.key});
@@ -48,12 +50,18 @@ class GlobalMiniPlayer extends GetView<PlayerService> {
                       },
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: Image.network(
-                          cover,
+                        child: CachedNetworkImage(
+                          imageUrl: cover,
                           width: 44,
                           height: 44,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox(
+                          cacheManager: AppCacheManager.instance,
+                          placeholder: (_, __) => const SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: ColoredBox(color: Color(0xFFF5F5F5)),
+                          ),
+                          errorWidget: (_, __, ___) => const SizedBox(
                             width: 44,
                             height: 44,
                             child: ColoredBox(color: Color(0xFFEFEFEF)),

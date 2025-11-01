@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/app/ui/song/lyric_list.dart';
 import 'package:tono_music/app/ui/song/player_panel.dart';
 import 'package:window_manager/window_manager.dart';
 import '../../services/player_service.dart';
+import 'package:tono_music/app/services/app_cache_manager.dart';
 
 class SongView extends GetView<PlayerService> {
   const SongView({super.key});
@@ -28,12 +30,18 @@ class SongView extends GetView<PlayerService> {
         final isWide = width >= 900;
         Widget coverPane({double size = 220}) => ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            controller.currentCover.value,
+          child: CachedNetworkImage(
+            imageUrl: controller.currentCover.value,
             width: size,
             height: size,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => SizedBox(
+            cacheManager: AppCacheManager.instance,
+            placeholder: (_, __) => SizedBox(
+              width: size,
+              height: size,
+              child: const ColoredBox(color: Color(0xFFF5F5F5)),
+            ),
+            errorWidget: (_, __, ___) => SizedBox(
               width: size,
               height: size,
               child: const ColoredBox(color: Color(0xFFEFEFEF)),

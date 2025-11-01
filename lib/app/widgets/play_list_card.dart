@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/app/routes/app_routes.dart';
+import 'package:tono_music/app/services/app_cache_manager.dart';
 
 class PlaylistCard extends StatelessWidget {
   final String id;
@@ -48,10 +50,15 @@ class PlaylistCard extends StatelessWidget {
             Flexible(
               child: AspectRatio(
                 aspectRatio: 1,
-                child: Image.network(
-                  coverUrl,
+                child: CachedNetworkImage(
+                  imageUrl: coverUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const ColoredBox(
+                  cacheManager: AppCacheManager.instance,
+                  placeholder: (_, __) => const ColoredBox(
+                    color: Color(0xFFF5F5F5),
+                    child: Center(child: Icon(Icons.image_outlined)),
+                  ),
+                  errorWidget: (_, __, ___) => const ColoredBox(
                     color: Color(0xFFEFEFEF),
                     child: Center(child: Icon(Icons.image_not_supported)),
                   ),

@@ -22,24 +22,28 @@ class CacheSettingsView extends GetView<SettingsController> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.image_outlined),
-                    title: const Text('可用图片缓存大小'),
-                    subtitle: Obx(() => Text('${controller.imageCacheMB} MB')),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Obx(() {
-                        final bytes = controller.imageCacheUsedBytes.value;
-                        final mb = (bytes / (1024 * 1024)).toStringAsFixed(2);
-                        return Text('当前占用：$mb MB');
-                      }),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: '刷新',
-                        onPressed: controller.updateImageCacheUsage,
-                        icon: const Icon(Icons.refresh),
-                      ),
-                    ],
+                    title: const Text('图片缓存（内存）'),
+                    subtitle: Obx(() {
+                      final used = controller.imageCacheUsedBytes.value;
+                      final usedMb = (used / (1024 * 1024)).toStringAsFixed(2);
+                      final limitMb = controller.imageCacheMB.value;
+                      return Text('占用：$usedMb MB / 上限：$limitMb MB');
+                    }),
+                    trailing: Wrap(
+                      spacing: 8,
+                      children: [
+                        IconButton(
+                          tooltip: '刷新',
+                          onPressed: controller.updateImageCacheUsage,
+                          icon: const Icon(Icons.refresh),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: controller.clearImageCache,
+                          icon: const Icon(Icons.cleaning_services_outlined),
+                          label: const Text('清理'),
+                        ),
+                      ],
+                    ),
                   ),
                   Obx(() {
                     final v = controller.imageCacheMB.value.toDouble();
@@ -56,10 +60,31 @@ class CacheSettingsView extends GetView<SettingsController> {
                     );
                   }),
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: controller.clearImageCache,
-                    icon: const Icon(Icons.cleaning_services_outlined),
-                    label: const Text('清理图片缓存（内存）'),
+                  const Divider(height: 24),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.sd_storage_outlined),
+                    title: const Text('图片缓存（磁盘）'),
+                    subtitle: Obx(() {
+                      final b = controller.imageDiskCacheBytes.value;
+                      final mb = (b / (1024 * 1024)).toStringAsFixed(2);
+                      return Text('当前占用：$mb MB');
+                    }),
+                    trailing: Wrap(
+                      spacing: 8,
+                      children: [
+                        IconButton(
+                          tooltip: '刷新',
+                          onPressed: controller.updateImageDiskCacheUsage,
+                          icon: const Icon(Icons.refresh),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: controller.clearImageDiskCache,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('清理'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -83,29 +108,21 @@ class CacheSettingsView extends GetView<SettingsController> {
                       final mb = (b / (1024 * 1024)).toStringAsFixed(2);
                       return Text('条目：$count / 估算占用：$mb MB');
                     }),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const SizedBox(width: 8),
-                      TextButton.icon(
-                        onPressed: controller.updateUrlCacheStats,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('刷新'),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: controller.clearUrlCacheExpired,
-                        icon: const Icon(Icons.history_toggle_off_outlined),
-                        label: const Text('清理过期条目'),
-                      ),
-                      const Spacer(),
-                      FilledButton.tonalIcon(
-                        onPressed: controller.clearUrlCacheAll,
-                        icon: const Icon(Icons.delete_sweep_outlined),
-                        label: const Text('清空 URL 缓存'),
-                      ),
-                    ],
+                    trailing: Wrap(
+                      spacing: 8,
+                      children: [
+                        IconButton(
+                          tooltip: '刷新',
+                          onPressed: controller.updateUrlCacheStats,
+                          icon: const Icon(Icons.refresh),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: controller.clearUrlCacheAll,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('清理'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
