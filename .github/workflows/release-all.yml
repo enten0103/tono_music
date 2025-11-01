@@ -16,6 +16,9 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  contents: write
+
 jobs:
   android:
     name: Build Android APKs (multi-ABI)
