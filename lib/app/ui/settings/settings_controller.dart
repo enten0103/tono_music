@@ -63,7 +63,6 @@ class SettingsController extends GetxController {
           'Microsoft YaHei',
           'SimSun',
           'Times New Roman',
-          'OppoSans',
         ];
         systemFonts.value = [
           ...{...list},
@@ -80,12 +79,9 @@ class SettingsController extends GetxController {
     globalFontFamily.value = family;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('globalFontFamily', family);
-    // 尝试加载该字体文件到 Flutter（仅当字体存在于系统时）
     try {
       final loaded = await SystemFonts().loadFont(family);
-      if (loaded == null) {
-        // 未能加载，不做额外处理，用户可以选择其它字体
-      }
+      if (loaded == null) {}
     } catch (_) {}
   }
 

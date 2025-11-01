@@ -8,6 +8,10 @@ import '../ui/root/root_view.dart';
 import 'app_routes.dart';
 import '../ui/settings/plugins/plugins_binding.dart';
 import '../ui/settings/plugins/plugins_view.dart';
+import '../ui/settings/sections/appearance_settings_view.dart';
+import '../ui/settings/sections/overlay_settings_view.dart';
+import '../ui/settings/sections/cache_settings_view.dart';
+import '../ui/settings/sections/notifications_settings_view.dart';
 import '../ui/playlist_detail/playlist_detail_binding.dart';
 import '../ui/playlist_detail/playlist_detail_view.dart';
 import '../ui/song/song_view.dart';
@@ -24,6 +28,26 @@ class AppPages {
       name: AppRoutes.plugins,
       page: () => const PluginsView(),
       binding: PluginsBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRoutes.settingsAppearance,
+      page: () => const AppearanceSettingsView(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRoutes.settingsOverlay,
+      page: () => const OverlaySettingsView(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRoutes.settingsCache,
+      page: () => const CacheSettingsView(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRoutes.settingsNotifications,
+      page: () => const NotificationsSettingsView(),
       transition: Transition.cupertino,
     ),
     GetPage(
