@@ -1,0 +1,215 @@
+name: Release All (Windows + Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag name (e.g. v1.2.3). If empty and not on tag, a tag manual-<run_id> will be created."
+        required: false
+        type: string
+      prerelease:
+        description: "Mark this release as pre-release"
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  android:
+    name: Build Android APKs (multi-ABI)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+        shell: bash
+
+      - name: Analyze
+        run: flutter analyze
+        shell: bash
+
+      - name: Prepare signing (if secrets provided)
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          set -e
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ] && [ -n "$ANDROID_STORE_PASSWORD" ]; then
+            echo "Signing secrets detected — preparing keystore & key.properties"
+            mkdir -p android/app
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n" \
+              "$ANDROID_STORE_PASSWORD" "$ANDROID_KEY_PASSWORD" "$ANDROID_KEY_ALIAS" \
+              > android/key.properties
+          else
+            echo "Signing secrets not provided — building unsigned artifacts"
+          fi
+
+      - name: Build APK (multi-ABI)
+        run: flutter build apk --release --split-per-abi
+        shell: bash
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: |
+            build/app/outputs/flutter-apk/*-release.apk
+          if-no-files-found: error
+
+  windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout (full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+        shell: pwsh
+
+      - name: Install deps
+        run: flutter pub get
+        shell: pwsh
+
+      - name: Analyze
+        run: flutter analyze
+        shell: pwsh
+
+      - name: Build Windows (Release)
+        run: flutter build windows --release
+        shell: pwsh
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+        shell: pwsh
+
+      - name: Compile installer (Inno Setup)
+        run: |
+          & "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" "installer\\installer.iss"
+        shell: pwsh
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            build/installer/*.exe
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute tag & changelog
+        id: meta
+        shell: bash
+        run: |
+          set -e
+          # Determine tag name
+          if [[ "${{ github.event_name }}" == "push" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ inputs.tag_name }}" ]]; then
+            TAG="${{ inputs.tag_name }}"
+          else
+            TAG="manual-${{ github.run_id }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+          # Determine previous tag (best effort)
+          PREV_TAG=""
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          else
+            PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          fi
+
+          echo "prev=$PREV_TAG" >> $GITHUB_OUTPUT
+
+          # Build changelog
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            TARGET="$TAG"
+          else
+            TARGET="HEAD"
+          fi
+
+          if [[ -n "$PREV_TAG" ]]; then
+            RANGE="$PREV_TAG..$TARGET"
+          else
+            RANGE="$(git rev-list --max-parents=0 HEAD | tail -n1)..$TARGET"
+          fi
+
+          echo "Generating changelog for range: $RANGE"
+          {
+            echo "## Changelog"
+            echo
+            git log --pretty=format:'- %s (%h) — %an' $RANGE || echo "No commits found."
+          } > CHANGELOG.md
+
+          echo "Changelog:" && cat CHANGELOG.md
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          path: dist
+          merge-multiple: true
+
+      - name: Create/Upload GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ inputs.prerelease || false }}
+          files: |
+            dist/**/*.exe
+            dist/**/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
