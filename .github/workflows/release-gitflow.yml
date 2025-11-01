@@ -151,6 +151,18 @@ jobs:
       - name: Build Windows (Release)
         run: flutter build windows --release
         shell: pwsh
+      - name: Create Windows portable ZIP
+        env:
+          APP_VERSION: ${{ needs.compute.outputs.version }}
+        run: |
+          $src = "build\windows\x64\runner\Release"
+          if (!(Test-Path $src)) { throw "Windows Release output not found: $src" }
+          $destDir = "build\portable"
+          New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+          $zip = Join-Path $destDir ("TonoMusic-Portable-" + $env:APP_VERSION + ".zip")
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $src '*') -DestinationPath $zip
+        shell: pwsh
       - name: Install Inno Setup
         run: choco install innosetup -y
         shell: pwsh
@@ -165,6 +177,13 @@ jobs:
         with:
           name: windows-installer-${{ needs.compute.outputs.tag }}
           path: build/installer/*.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable-${{ needs.compute.outputs.tag }}
+          path: build/portable/*.zip
           if-no-files-found: error
           retention-days: 14
 
