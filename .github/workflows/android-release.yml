@@ -1,0 +1,92 @@
+name: Build Android (APK & AAB)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Java 17 is required by modern Android Gradle Plugin
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      # Install Android SDK and accept licenses
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          yes | sdkmanager --licenses
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+        shell: bash
+
+      - name: Analyze
+        run: flutter analyze
+        shell: bash
+
+      # Optional signing (AAB/APK) — requires the following GitHub Secrets:
+      #   ANDROID_KEYSTORE_BASE64: base64 of your JKS/keystore file
+      #   ANDROID_KEY_ALIAS
+      #   ANDROID_KEY_PASSWORD
+      #   ANDROID_STORE_PASSWORD
+      # If not provided, build will proceed unsigned.
+      - name: Prepare signing (if secrets provided)
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          set -e
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ] && [ -n "$ANDROID_STORE_PASSWORD" ]; then
+            echo "Signing secrets detected — preparing keystore & key.properties"
+            mkdir -p android/app
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+            cat > android/key.properties <<EOF
+            storePassword=$ANDROID_STORE_PASSWORD
+            keyPassword=$ANDROID_KEY_PASSWORD
+            keyAlias=$ANDROID_KEY_ALIAS
+            storeFile=upload-keystore.jks
+EOF
+          else
+            echo "Signing secrets not provided — building unsigned artifacts"
+          fi
+
+      - name: Build APK (multi-ABI release)
+        run: flutter build apk --release --split-per-abi
+        shell: bash
+
+      - name: Build App Bundle (AAB, release)
+        run: flutter build appbundle --release
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-artifacts-multiabi-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/*-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
