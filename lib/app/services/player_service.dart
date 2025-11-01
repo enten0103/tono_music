@@ -5,6 +5,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:music_sdk/music_sdk.dart';
 import 'plugin_service.dart';
+import 'url_cache_service.dart';
 
 enum PlayerState { ready, loading, error }
 
@@ -46,6 +47,16 @@ class PlayerService extends GetxService {
     if (!Platform.isWindows) {
       final session = await AudioSession.instance;
       await session.configure(const AudioSessionConfiguration.music());
+    }
+
+    // 确保 URL 缓存服务已就绪
+    if (!Get.isRegistered<UrlCacheService>()) {
+      await Get.putAsync(() async => await UrlCacheService().init());
+    } else {
+      final s = Get.find<UrlCacheService>();
+      if (!s.initialized) {
+        await s.init();
+      }
     }
 
     _player.stream.playing.listen((state) {
@@ -232,22 +243,57 @@ class PlayerService extends GetxService {
       source: item.source,
       artists: item.artists,
     );
-    // 获取播放地址
-    try {
-      final plugin = Get.find<PluginService>();
-      currentLyricLine.value = '正在获取播放地址...';
+    // 获取播放地址（缓存优先，失败清缓存；成功写入真实 type）
+    final urlCache = Get.find<UrlCacheService>();
+    final plugin = Get.find<PluginService>();
+
+    // 1) 尝试使用缓存（按所选音质）
+    final desiredType = Get.find<PluginService>().selectedType.value.trim();
+    final cached = (desiredType.isEmpty)
+        ? null
+        : await urlCache.getCachedForType(item.source, item.id, desiredType);
+    if (cached != null && cached.url.isNotEmpty) {
+      currentLyricLine.value = '正在使用缓存的播放地址...';
+      Get.log('PlayerService: 使用缓存的播放地址 ${cached.url}');
       state.value = PlayerState.loading;
-      final url = await plugin.getMusicUrlForSource(
-        source: item.source,
-        musicInfo: {'songmid': item.id, 'source': item.source},
-      );
-      state.value = PlayerState.ready;
-      currentLyricLine.value = '获取播放地址成功';
-      await setUrl(url);
-    } catch (e) {
-      state.value = PlayerState.error;
-      currentLyricLine.value = '获取播放地址失败';
-      return;
+      await setUrl(cached.url);
+      if (state.value != PlayerState.error) {
+        // 缓存可用，刷新时间戳
+        await urlCache.refreshWithType(item.source, item.id, cached.type);
+      } else {
+        // 缓存已失效，删除并继续走网络获取
+        await urlCache.invalidateWithType(item.source, item.id, cached.type);
+        // 标记为需要走网络
+      }
+    }
+
+    // 2) 缓存不可用或失效，走插件获取
+    // 若未命中缓存或缓存已失效，走插件获取
+    if (cached == null || state.value == PlayerState.error) {
+      try {
+        currentLyricLine.value = '正在获取播放地址...';
+        state.value = PlayerState.loading;
+        final res = await plugin.getMusicUrlForSource(
+          source: item.source,
+          musicInfo: {'songmid': item.id, 'source': item.source},
+        );
+        state.value = PlayerState.ready;
+        currentLyricLine.value = '获取播放地址成功';
+        await setUrl(res.url);
+        if (state.value != PlayerState.error) {
+          final realType = res.type ?? plugin.selectedType.value;
+          await urlCache.putUrl(
+            source: item.source,
+            songId: item.id,
+            url: res.url,
+            type: realType,
+          );
+        }
+      } catch (e) {
+        state.value = PlayerState.error;
+        currentLyricLine.value = '获取播放地址失败';
+        return;
+      }
     }
     // 获取歌词
     try {

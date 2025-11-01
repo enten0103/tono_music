@@ -6,6 +6,7 @@ import 'package:flutter_js/flutter_js.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/core/bridge_js.dart';
 import 'package:tono_music/core/crypto_js.dart';
+import 'models/plugin_models.dart';
 
 /// JS 插件引擎：基于 flutter_js 将，globalThis.lx 注入到 JS 运行时中。
 ///
@@ -177,7 +178,7 @@ class PluginEngine {
     return data;
   }
 
-  Future<String> getMusicUrl({
+  Future<MusicUrlResult> getMusicUrl({
     required String source,
     String? type,
     required Map<String, dynamic> musicInfo,
@@ -187,11 +188,7 @@ class PluginEngine {
       action: 'musicUrl',
       info: {'type': type, 'musicInfo': musicInfo},
     );
-    if (result is String) return result;
-    if (result is Map && result['url'] is String) {
-      return result['url'] as String;
-    }
-    return result?.toString() ?? '';
+    return MusicUrlResult.fromDynamic(result);
   }
 
   Future<void> _installCryptoObject() async {

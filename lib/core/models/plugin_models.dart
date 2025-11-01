@@ -61,3 +61,29 @@ class InitedPayload {
     'sources': sources.map((k, v) => MapEntry(k, v.toJson())),
   };
 }
+
+class MusicUrlResult {
+  final String url;
+  final String? type;
+
+  const MusicUrlResult({required this.url, this.type});
+
+  bool get hasUrl => url.isNotEmpty;
+
+  factory MusicUrlResult.fromDynamic(dynamic value) {
+    if (value is String) {
+      return MusicUrlResult(url: value);
+    }
+    if (value is Map) {
+      final m = Map<String, dynamic>.from(value);
+      final u = (m['url'] ?? '').toString();
+      // 兼容插件返回字段名：type 或 quality
+      final tRaw = (m.containsKey('type') ? m['type'] : m['quality']);
+      final t = tRaw?.toString();
+      return MusicUrlResult(url: u, type: t);
+    }
+    return const MusicUrlResult(url: '');
+  }
+
+  Map<String, dynamic> toJson() => {'url': url, if (type != null) 'type': type};
+}

@@ -87,7 +87,7 @@ class PluginEngineClient {
     return Map<String, dynamic>.from(res as Map);
   }
 
-  Future<String?> getMusicUrlForSource(
+  Future<Map<String, dynamic>?> getMusicUrlForSource(
     String source,
     List<String> candidates,
     Map<String, dynamic>? musicInfo, {
@@ -99,7 +99,7 @@ class PluginEngineClient {
       'musicInfo': musicInfo ?? {},
     }, timeout: timeout);
     if (res == null) return null;
-    return res.toString();
+    return Map<String, dynamic>.from(res as Map);
   }
 
   Future<dynamic> request(
@@ -188,16 +188,16 @@ Future<void> _engineIsolateEntry(SendPort mainSend) async {
               args['musicInfo'] ?? {},
             );
             Object? lastErr;
-            String? found;
+            Map<String, dynamic>? found;
             for (final candidate in candidates) {
               try {
-                final u = await engine?.getMusicUrl(
+                final r = await engine?.getMusicUrl(
                   source: sourceArg,
                   type: candidate,
                   musicInfo: musicInfo,
                 );
-                if (u != null && u.toString().isNotEmpty) {
-                  found = u.toString();
+                if (r != null && r.url.isNotEmpty) {
+                  found = r.toJson();
                   break;
                 }
               } catch (e) {
@@ -226,11 +226,12 @@ Future<void> _engineIsolateEntry(SendPort mainSend) async {
             final musicInfo = Map<String, dynamic>.from(
               args['musicInfo'] ?? {},
             );
-            res = await engine?.getMusicUrl(
+            final r = await engine?.getMusicUrl(
               source: source,
               type: typeArg,
               musicInfo: musicInfo,
             );
+            res = r?.toJson();
           } else if (method == 'getCurrentScriptInfo') {
             res = engine?.getCurrentScriptInfo(
               includeRaw: args['includeRaw'] == true,

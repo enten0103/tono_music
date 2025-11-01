@@ -15,6 +15,7 @@ class AppearanceSettingsView extends GetView<SettingsController> {
         children: [
           if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
             Card(
+              elevation: 0,
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(

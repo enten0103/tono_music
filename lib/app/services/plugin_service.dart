@@ -201,22 +201,28 @@ class PluginService extends GetxService {
     _persistState();
   }
 
-  /// 按给定 source 依序尝试音质，获取歌曲 URL。
-  Future<String> getMusicUrlForSource({
+  /// 按给定 source 依次“降级”尝试音质：
+  /// 注意：插件返回的 qualitys 列表约定为【前=差，后=好】。
+  /// 因此从当前选择的音质开始，向左（更差）依次尝试；若当前选择不在列表，则从最好的开始降级到最差。
+  Future<MusicUrlResult> getMusicUrlForSource({
     required String source,
     required Map<String, dynamic> musicInfo,
   }) async {
     final spec = sources[source];
     final qualitys = spec?.qualitys ?? <String>[];
+
     final List<String> candidates = [];
     final start = selectedType.value.trim();
-    if (start.isNotEmpty && qualitys.contains(start)) {
-      candidates.add(start);
-      for (final quality in qualitys) {
-        if (quality != start) candidates.add(quality);
+    final idx = qualitys.indexOf(start);
+    if (idx >= 0) {
+      candidates.add(qualitys[idx]);
+      for (int i = idx - 1; i >= 0; i--) {
+        candidates.add(qualitys[i]);
       }
-    } else if (qualitys.isNotEmpty) {
-      candidates.addAll(qualitys);
+    } else {
+      for (int i = qualitys.length - 1; i >= 0; i--) {
+        candidates.add(qualitys[i]);
+      }
     }
 
     final res = await client.getMusicUrlForSource(
@@ -225,7 +231,10 @@ class PluginService extends GetxService {
       musicInfo,
       timeout: const Duration(seconds: 30),
     );
-    if (res != null && res.isNotEmpty) return res;
+    if (res != null) {
+      final parsed = MusicUrlResult.fromDynamic(res);
+      if (parsed.url.isNotEmpty) return parsed;
+    }
     throw Exception(
       'getMusicUrlForSource failed for source=$source (no url returned)',
     );
