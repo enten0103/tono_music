@@ -68,41 +68,44 @@ class GlobalMiniPlayer extends GetView<PlayerService> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 根据屏幕宽度决定是否显示右侧操作按钮
+                    // （不在这里用宽度，仅用于控制尾部区域的显示）
                     Row(
                       children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              if (songId.isNotEmpty && source.isNotEmpty) {
-                                Get.toNamed(
-                                  AppRoutes.song,
-                                  arguments: {
-                                    'id': songId,
-                                    'source': source,
-                                    'name': title,
-                                    'coverUrl': cover,
-                                  },
-                                );
-                              }
-                            },
-                            child: Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
+                        // 歌名尽量小，占比较小的空间
+                        InkWell(
+                          onTap: () {
+                            if (songId.isNotEmpty && source.isNotEmpty) {
+                              Get.toNamed(
+                                AppRoutes.song,
+                                arguments: {
+                                  'id': songId,
+                                  'source': source,
+                                  'name': title,
+                                  'coverUrl': cover,
+                                },
+                              );
+                            }
+                          },
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            // 保持原字号（不改大小）
+                            style: Theme.of(context).textTheme.titleSmall,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // 滚动歌词（单行，随播放更新）
-                        Flexible(
+                        // 歌名旁边的歌词尽量大且居中
+                        Expanded(
                           child: Text(
                             rollingLyric,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            // 保持原字号与颜色风格
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Theme.of(context).hintColor),
-                            textAlign: TextAlign.right,
                           ),
                         ),
                       ],
@@ -134,39 +137,55 @@ class GlobalMiniPlayer extends GetView<PlayerService> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Obx(
-                () => Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        controller.playing.value
-                            ? Icons.pause
-                            : Icons.play_arrow,
+              ...(() {
+                final isNarrow = MediaQuery.of(context).size.width < 500;
+                return <Widget>[
+                  const SizedBox(width: 8),
+                  if (isNarrow)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.skip_next),
+                          tooltip: '下一曲',
+                          onPressed: () => controller.next(),
+                        ),
+                      ],
+                    )
+                  else
+                    Obx(
+                      () => Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              controller.playing.value
+                                  ? Icons.pause
+                                  : Icons.play_arrow,
+                            ),
+                            onPressed: () {
+                              if (controller.playing.value) {
+                                controller.pause();
+                              } else {
+                                controller.play();
+                              }
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.skip_next),
+                            tooltip: '下一曲',
+                            onPressed: () => controller.next(),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.queue_music),
+                            tooltip: '查看播放列表',
+                            onPressed: () => showQueueSheet(context),
+                          ),
+                        ],
                       ),
-                      onPressed: () {
-                        if (controller.playing.value) {
-                          controller.pause();
-                        } else {
-                          controller.play();
-                        }
-                      },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.skip_next),
-                      tooltip: '下一曲',
-                      onPressed: () => controller.next(),
-                    ),
-
-                    IconButton(
-                      icon: const Icon(Icons.queue_music),
-                      tooltip: '查看播放列表',
-                      onPressed: () => showQueueSheet(context),
-                    ),
-                  ],
-                ),
-              ),
+                ];
+              })(),
             ],
           ),
         ),

@@ -58,13 +58,11 @@ Future<void> initDependencies() async {
 }
 
 Future<void> initImageCache() async {
-  // 应用图片缓存大小（从设置中读取，默认 256 MB）
   try {
     final prefs = await SharedPreferences.getInstance();
     final mb = prefs.getInt('imageCacheMB') ?? 256;
     final bytes = mb * 1024 * 1024;
     PaintingBinding.instance.imageCache.maximumSizeBytes = bytes;
-    // 可适当提高缓存的条目数量上限
     PaintingBinding.instance.imageCache.maximumSize = 1000;
   } catch (_) {
     // 忽略读取失败
@@ -75,8 +73,6 @@ Future<void> initImageCache() async {
 Future<void> initWindow() async {
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
     await windowManager.ensureInitialized();
-    // 当窗口被关闭时不退出应用（隐藏到系统托盘）
-    // 需要配合托盘服务使用：关闭操作会隐藏窗口，托盘菜单提供退出入口
     try {
       await windowManager.setPreventClose(true);
       windowManager.addListener(_HideOnCloseListener());
@@ -84,7 +80,7 @@ Future<void> initWindow() async {
     const windowOptions = WindowOptions(
       title: 'TonoMusic',
       size: Size(1280, 800),
-      minimumSize: Size(900, 600),
+      minimumSize: Size(400, 600),
       center: true,
       titleBarStyle: TitleBarStyle.hidden,
     );
