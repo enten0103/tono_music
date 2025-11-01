@@ -30,7 +30,6 @@ class App extends StatelessWidget {
       initialRoute: AppRoutes.home,
       getPages: AppPages.routes,
       defaultTransition: Transition.cupertino,
-      // Back press handling is implemented in RootView via WillPopScope.
     );
   }
 }

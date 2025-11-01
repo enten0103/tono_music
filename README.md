@@ -13,7 +13,7 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
 
 - [x] 基础插件运行时
 - [ ] 完整插件运行时
-- [ ] 流式API
+- [x] 流式API
 
 插件运行时
 

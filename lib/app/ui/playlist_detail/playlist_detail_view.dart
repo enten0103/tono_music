@@ -118,12 +118,33 @@ class PlaylistDetailView extends GetView<PlaylistDetailController> {
                     child: RefreshIndicator(
                       onRefresh: controller.refresh,
                       child: ListView.separated(
-                        itemCount: tracks.length,
+                        itemCount:
+                            tracks.length +
+                            (controller.streaming.value ? 1 : 0),
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (_, i) {
+                          final isStreaming = controller.streaming.value;
+                          // 尾部 loading 行
+                          if (isStreaming && i == tracks.length) {
+                            return const Padding(
+                              padding: EdgeInsets.only(top: 12, bottom: 64),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
                           final song = tracks[i];
+                          final isLastReal =
+                              (i == tracks.length - 1) && !isStreaming;
                           return Padding(
-                            padding: i == tracks.length - 1
+                            padding: isLastReal
                                 ? const EdgeInsets.only(bottom: 64)
                                 : const EdgeInsets.only(bottom: 0),
                             child: ListTile(
