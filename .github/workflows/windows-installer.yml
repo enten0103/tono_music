@@ -1,0 +1,57 @@
+name: Build Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+        shell: pwsh
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+        shell: pwsh
+
+      - name: Install dependencies
+        run: flutter pub get
+        shell: pwsh
+
+      - name: Analyze
+        run: flutter analyze
+        shell: pwsh
+
+      - name: Build Windows (Release)
+        run: flutter build windows --release
+        shell: pwsh
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+        shell: pwsh
+
+      - name: Compile installer (Inno Setup)
+        run: |
+          & "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" "installer\\installer.iss"
+        shell: pwsh
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TonoMusic-Installer-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            build/installer/*.exe
+          if-no-files-found: error

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:get/get.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -7,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:tono_music/app/services/player_service.dart';
 import 'package:tono_music/app/services/lyrics_overlay_controller.dart';
 import 'package:tono_music/app/services/lyrics_overlay_service.dart';
+import 'package:flutter/services.dart' show rootBundle, ByteData;
 
 class TrayService extends GetxService with TrayListener {
   final PlayerService _player = Get.find();
@@ -16,12 +18,20 @@ class TrayService extends GetxService with TrayListener {
       return this;
     }
 
-    String? iconPath;
+    // 选择托盘图标（Windows）：优先从 Flutter 资源包加载并写入临时绝对路径，避免开发模式下相对路径失效
     if (Platform.isWindows) {
-      iconPath = "assets/icons/app_icon.ico";
-    }
-    if (iconPath != null) {
-      await trayManager.setIcon(iconPath);
+      try {
+        final ByteData data = await rootBundle.load(
+          'assets/icons/app_icon.ico',
+        );
+        final Uint8List bytes = data.buffer.asUint8List();
+        final String tempPath = File(
+          '${Directory.systemTemp.path}${Platform.pathSeparator}tono_music_tray_icon.ico',
+        ).path;
+        final file = File(tempPath);
+        await file.writeAsBytes(bytes, flush: true);
+        await trayManager.setIcon(file.path);
+      } catch (_) {}
     }
     await trayManager.setToolTip('TonoMusic');
     final menu = await _buildMenu();

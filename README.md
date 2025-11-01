@@ -84,3 +84,22 @@ A:部分平台SDK强依赖于js运行时，难以复刻为dart代码
 Q:为什么没有鸿蒙相关支持计划  
 A:插件运行时依赖于quickjs或其它js运行时，目前未见移植
 
+## 打包发布（Windows / Inno Setup）
+
+仅发行 Windows，使用 Inno Setup 生成安装包：
+
+1. 先构建 Release 可执行文件（PowerShell）
+    - flutter build windows
+2. 安装 Inno Setup 6（https://jrsoftware.org/isinfo.php）
+3. 生成安装包
+    - 用 Inno Setup 打开 `installer/installer.iss` 并点击编译
+    - 或命令行编译：
+      - "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" installer\\installer.iss
+4. 安装包输出位置：`build/installer/TonoMusic-Setup-1.0.0.exe`
+
+提示：
+- `installer/installer.iss` 会将 `build/windows/x64/runner/Release` 目录整体打入安装包；请在每次打包前先执行 `flutter build windows`。
+- 如需修改安装目录、应用名、版本号等，可编辑 `installer/installer.iss` 顶部的常量定义。
+
+
+
