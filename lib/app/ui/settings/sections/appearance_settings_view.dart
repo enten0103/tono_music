@@ -116,7 +116,7 @@ class AppearanceSettingsView extends GetView<SettingsController> {
                       children: [
                         SegmentedButton<int>(
                           segments: const <ButtonSegment<int>>[
-                            ButtonSegment<int>(value: 0, label: Text('跟随系统')),
+                            ButtonSegment<int>(value: 0, label: Text('系统')),
                             ButtonSegment<int>(value: 1, label: Text('亮色')),
                             ButtonSegment<int>(value: 2, label: Text('深色')),
                           ],
@@ -128,11 +128,6 @@ class AppearanceSettingsView extends GetView<SettingsController> {
                           },
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          '根据系统外观自动切换（仅当选择“跟随系统”时）',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: Theme.of(context).hintColor),
-                        ),
                       ],
                     );
                   }),
@@ -173,7 +168,7 @@ class AppearanceSettingsView extends GetView<SettingsController> {
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: CircleAvatar(backgroundColor: Color(argb)),
-                      title: const Text('自定义主色 (RGBA/Hex)'),
+                      title: const Text('自定义主色'),
                       subtitle: Text('当前：$hex'),
                       trailing: OutlinedButton.icon(
                         icon: const Icon(Icons.edit_outlined),

@@ -26,12 +26,12 @@ class CacheSettingsView extends GetView<SettingsController> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.image_outlined),
-                    title: const Text('图片缓存（内存）'),
+                    title: const Text('图片（内存）'),
                     subtitle: Obx(() {
                       final used = controller.imageCacheUsedBytes.value;
                       final usedMb = (used / (1024 * 1024)).toStringAsFixed(2);
                       final limitMb = controller.imageCacheMB.value;
-                      return Text('占用：$usedMb MB / 上限：$limitMb MB');
+                      return Text('$usedMb/$limitMb MB');
                     }),
                     trailing: Wrap(
                       spacing: 8,
@@ -68,11 +68,11 @@ class CacheSettingsView extends GetView<SettingsController> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.sd_storage_outlined),
-                    title: const Text('图片缓存（磁盘）'),
+                    title: const Text('图片缓存'),
                     subtitle: Obx(() {
                       final b = controller.imageDiskCacheBytes.value;
                       final mb = (b / (1024 * 1024)).toStringAsFixed(2);
-                      return Text('当前占用：$mb MB');
+                      return Text('$mb MB');
                     }),
                     trailing: Wrap(
                       spacing: 8,
@@ -108,9 +108,7 @@ class CacheSettingsView extends GetView<SettingsController> {
                     title: const Text('URL 缓存'),
                     subtitle: Obx(() {
                       final count = controller.urlCacheEntryCount.value;
-                      final b = controller.urlCacheStorageBytes.value;
-                      final mb = (b / (1024 * 1024)).toStringAsFixed(2);
-                      return Text('条目：$count / 估算占用：$mb MB');
+                      return Text('$count 条');
                     }),
                     trailing: Wrap(
                       spacing: 8,
