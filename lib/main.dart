@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/bootstrap.dart';
-import 'package:tono_music/config.dart';
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 import 'app/ui/settings/settings_controller.dart';
@@ -18,14 +17,13 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 确保 SettingsController 就绪（用于主题与主色）
-    final settings = Get.put(SettingsController(), permanent: true);
+    final settings = Get.find<SettingsController>();
     return Obx(() {
       final seed = Color(settings.primaryColor.value);
       final modeInt = settings.themeMode.value;
       final baseFont =
           Platform.isWindows || Platform.isMacOS || Platform.isLinux
-          ? Get.find<AppConfig>().globalFontFamily.value
+          ? settings.globalFontFamily.value
           : null;
       final light = ThemeData(
         colorScheme: ColorScheme.fromSeed(

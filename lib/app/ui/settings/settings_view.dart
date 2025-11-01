@@ -22,9 +22,8 @@ class SettingsView extends GetView<SettingsController> {
         const Divider(),
         _SettingsTile(
           icon: Icons.palette_outlined,
-          title: '外观与字体',
-          subtitleBuilder: () =>
-              Obx(() => Text('字体：${controller.globalFontFamily.value}')),
+          title: '颜色与字体',
+          subtitleBuilder: () => Text('自定义应用外观'),
           onTap: () => Get.toNamed(AppRoutes.settingsAppearance),
         ),
         _SettingsTile(

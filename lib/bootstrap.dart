@@ -13,7 +13,7 @@ import 'package:tono_music/app/services/plugin_service.dart';
 import 'package:tono_music/app/services/tray_service.dart';
 import 'package:tono_music/app/services/smtc_service.dart';
 import 'package:tono_music/app/services/lyrics_overlay_controller.dart';
-import 'package:tono_music/config.dart';
+import 'package:tono_music/app/ui/settings/settings_controller.dart';
 import 'package:window_manager/window_manager.dart';
 
 Future<void> bootstrap() async {
@@ -51,8 +51,6 @@ Future<void> initDependencies() async {
     Get.put<TrayService>(trayService);
     final lyricsController = await LyricsOverlayController().init();
     Get.put<LyricsOverlayController>(lyricsController);
-    final appConfig = await AppConfig().init();
-    Get.put<AppConfig>(appConfig);
   }
   if (Platform.isAndroid) {
     final notificationService = await NotificationService().init();
@@ -62,6 +60,8 @@ Future<void> initDependencies() async {
     final smtcService = await SMTCService().init();
     Get.put<SMTCService>(smtcService);
   }
+  final SettingsController settingsController = SettingsController();
+  Get.put<SettingsController>(settingsController, permanent: true);
 }
 
 Future<void> initImageCache() async {
