@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:window_manager/window_manager.dart';
 import '../settings_controller.dart';
 
 class CacheSettingsView extends GetView<SettingsController> {
@@ -8,7 +9,10 @@ class CacheSettingsView extends GetView<SettingsController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('缓存')),
+      appBar: AppBar(
+        title: DragToMoveArea(child: const Text('缓存')),
+        flexibleSpace: DragToMoveArea(child: SizedBox.expand()),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [

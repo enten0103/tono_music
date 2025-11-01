@@ -6,6 +6,7 @@ import 'package:tono_music/bootstrap.dart';
 import 'package:tono_music/config.dart';
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
+import 'app/ui/settings/settings_controller.dart';
 
 Future<void> main() async {
   await bootstrap();
@@ -17,19 +18,46 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: 'TonoMusic',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+    // 确保 SettingsController 就绪（用于主题与主色）
+    final settings = Get.put(SettingsController(), permanent: true);
+    return Obx(() {
+      final seed = Color(settings.primaryColor.value);
+      final modeInt = settings.themeMode.value;
+      final baseFont =
+          Platform.isWindows || Platform.isMacOS || Platform.isLinux
+          ? Get.find<AppConfig>().globalFontFamily.value
+          : null;
+      final light = ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.light,
+        ),
         useMaterial3: true,
-        fontFamily: Platform.isWindows || Platform.isMacOS || Platform.isLinux
-            ? Get.find<AppConfig>().globalFontFamily.value
-            : null,
-      ),
-      initialRoute: AppRoutes.home,
-      getPages: AppPages.routes,
-      defaultTransition: Transition.cupertino,
-    );
+        fontFamily: baseFont,
+      );
+      final dark = ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+        fontFamily: baseFont,
+      );
+      final ThemeMode mode = switch (modeInt) {
+        1 => ThemeMode.light,
+        2 => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+      return GetMaterialApp(
+        title: 'TonoMusic',
+        debugShowCheckedModeBanner: false,
+        theme: light,
+        darkTheme: dark,
+        themeMode: mode,
+        initialRoute: AppRoutes.home,
+        getPages: AppPages.routes,
+        defaultTransition: Transition.cupertino,
+      );
+    });
   }
 }

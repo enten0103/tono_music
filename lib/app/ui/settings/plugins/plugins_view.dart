@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:window_manager/window_manager.dart';
 import 'plugins_controller.dart';
 
 class PluginsView extends GetView<PluginsController> {
@@ -14,7 +15,8 @@ class PluginsView extends GetView<PluginsController> {
           onPressed: Get.back,
           tooltip: '返回',
         ),
-        title: const Text('插件管理'),
+        title: DragToMoveArea(child: const Text('插件管理')),
+        flexibleSpace: DragToMoveArea(child: SizedBox.expand()),
         actions: [
           IconButton(
             tooltip: '从文件导入',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:window_manager/window_manager.dart';
 import '../settings_controller.dart';
 import 'package:tono_music/app/services/lyrics_overlay_service.dart';
 
@@ -9,7 +10,10 @@ class OverlaySettingsView extends GetView<SettingsController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('桌面歌词')),
+      appBar: AppBar(
+        title: DragToMoveArea(child: const Text('桌面歌词')),
+        flexibleSpace: DragToMoveArea(child: SizedBox.expand()),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [

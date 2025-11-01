@@ -11,8 +11,9 @@ import 'package:tono_music/app/services/lyrics_overlay_service.dart';
 import 'package:system_fonts/system_fonts.dart';
 
 class SettingsController extends GetxController {
-  final RxBool darkMode = false.obs;
-  void toggleDark() => darkMode.value = !darkMode.value;
+  // 主题模式：0 跟随系统，1 亮色，2 深色
+  final RxInt themeMode = 0.obs;
+  final RxInt primaryColor = 0xFF2196F3.obs; // 默认蓝色
 
   // 图片缓存（单位：MB）
   final RxInt imageCacheMB = 256.obs;
@@ -41,6 +42,7 @@ class SettingsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _loadThemeSettings();
     _loadImageCache();
     _loadOverlaySettings();
     _loadGlobalFontSetting();
@@ -52,6 +54,35 @@ class SettingsController extends GetxController {
       await updateUrlCacheStats();
       await updateImageDiskCacheUsage();
     });
+  }
+
+  Future<void> _loadThemeSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedMode = prefs.getInt('theme.mode');
+    if (storedMode == null) {
+      // 兼容旧字段 theme.dark
+      final oldDark = prefs.getBool('theme.dark');
+      if (oldDark == null) {
+        themeMode.value = 0; // 默认跟随系统
+      } else {
+        themeMode.value = oldDark ? 2 : 1;
+      }
+    } else {
+      themeMode.value = storedMode.clamp(0, 2);
+    }
+    primaryColor.value = prefs.getInt('theme.primary') ?? 0xFF2196F3; // 蓝色
+  }
+
+  Future<void> setThemeMode(int mode) async {
+    themeMode.value = mode.clamp(0, 2);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('theme.mode', themeMode.value);
+  }
+
+  Future<void> setPrimaryColor(int argb) async {
+    primaryColor.value = argb;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('theme.primary', argb);
   }
 
   Future<void> _loadGlobalFontSetting() async {
