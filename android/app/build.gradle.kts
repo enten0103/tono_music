@@ -64,3 +64,8 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // For MediaStyle notifications (androidx.media.app.NotificationCompat)
+    implementation("androidx.media:media:1.7.0")
+}

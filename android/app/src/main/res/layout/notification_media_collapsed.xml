@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp"
+    android:gravity="center_vertical"
+    android:baselineAligned="false"
+    android:clipToPadding="false"
+    android:minHeight="64dp">
+
+    <!-- Left: title (top) + subtitle (bottom) anchored to avoid clipping across updates -->
+    <RelativeLayout
+        android:id="@+id/textContainer"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:paddingStart="4dp"
+        android:paddingEnd="6dp"
+        android:clipToPadding="false">
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:includeFontPadding="false"
+            android:text="Title"/>
+
+        <TextView
+            android:id="@+id/tvText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:includeFontPadding="false"
+            android:text="Subtitle"/>
+    </RelativeLayout>
+
+    <!-- Right: action buttons (horizontal) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:paddingStart="6dp">
+
+        <ImageButton
+            android:id="@+id/btnPrev"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@android:color/transparent"
+            android:scaleType="centerInside"
+            android:src="@drawable/skip_previous_24px"/>
+
+        <ImageButton
+            android:id="@+id/btnPlayPause"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@android:color/transparent"
+            android:scaleType="centerInside"
+            android:src="@drawable/play_arrow_24px"/>
+
+        <ImageButton
+            android:id="@+id/btnNext"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@android:color/transparent"
+            android:scaleType="centerInside"
+            android:src="@drawable/skip_next_24px"/>
+    </LinearLayout>
+</LinearLayout>

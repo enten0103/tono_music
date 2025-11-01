@@ -68,7 +68,7 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
     - [x] 托盘
     - [ ] 桌面歌词
 - [ ] andorid
-    - [ ] 通知栏
+    - [x] 通知栏
     - [ ] 标准控制
     - [ ] 桌面歌词
 - [ ] ios
@@ -83,7 +83,7 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
 缓存相关
 - [x] 封面缓存
 - [ ] 歌词缓存
-- [ ] url缓存
+- [x] url缓存
 - [ ] 歌曲缓存
 
 

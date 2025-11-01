@@ -1,94 +1,75 @@
-import 'package:awesome_notifications/awesome_notifications.dart';
-import 'package:flutter/material.dart';
+import 'dart:io';
+// import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/app/services/player_service.dart';
 
 @pragma("vm:entry-point")
 class NotificationService extends GetxService {
   final PlayerService playerService = Get.find();
+  // Native Android channels
+  static const MethodChannel _nativeChannel = MethodChannel(
+    'tono_music/notification',
+  );
+  static const EventChannel _nativeEvents = EventChannel(
+    'tono_music/notification_events',
+  );
+  bool _nativeAvailable = false;
 
   Future checkAndRequestPermission() async {
-    bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
-    if (!isAllowed) {
-      await AwesomeNotifications().requestPermissionToSendNotifications();
-    }
+    if (!Platform.isAndroid) return;
+    try {
+      final allowed =
+          await _nativeChannel.invokeMethod<bool>('isAllowed') ?? true;
+      if (!allowed) {
+        await _nativeChannel.invokeMethod('requestPermission');
+      }
+    } catch (_) {}
   }
 
   Future updateNotification() async {
-    await AwesomeNotifications().createNotification(
-      content: NotificationContent(
-        id: 1,
-        channelKey: 'music_channel',
-        notificationLayout: NotificationLayout.MediaPlayer,
-        title: playerService.currentTitle.value,
-        body: "🎵 ${playerService.currentLyricLine.value}",
-        actionType: ActionType.SilentAction,
-        autoDismissible: false,
-        showWhen: false,
-      ),
-      actionButtons: [
-        NotificationActionButton(
-          actionType: ActionType.SilentAction,
-          key: 'prev',
-          label: '上一曲',
-          autoDismissible: false,
-          showInCompactView: true,
-        ),
-        !playerService.playing.value
-            ? NotificationActionButton(
-                key: 'play',
-                label: '播放',
-                actionType: ActionType.SilentAction,
-                autoDismissible: false,
-                showInCompactView: true,
-              )
-            : NotificationActionButton(
-                key: 'pause',
-                label: '暂停',
-                actionType: ActionType.SilentAction,
-                autoDismissible: false,
-                showInCompactView: true,
-              ),
-        NotificationActionButton(
-          key: 'next',
-          label: '下一曲',
-          actionType: ActionType.SilentAction,
-          autoDismissible: false,
-          showInCompactView: true,
-        ),
-      ],
-    );
+    if (Platform.isAndroid && _nativeAvailable) {
+      try {
+        await _nativeChannel.invokeMethod('update', {
+          'title': playerService.currentTitle.value,
+          'text': (playerService.artists.isNotEmpty)
+              ? playerService.artists.join('/')
+              : '',
+          'cover': playerService.currentCover.value,
+          'playing': playerService.playing.value,
+        });
+        return;
+      } catch (_) {}
+    }
   }
 
   Future<NotificationService> init() async {
-    await AwesomeNotifications().initialize(
-      null,
-      [
-        NotificationChannel(
-          channelKey: 'music_channel',
-          channelName: '音乐播放器通知',
-          channelDescription: '用于音乐播放控制的通知栏',
-          defaultColor: Color(0xFF2196F3),
-          ledColor: Colors.white,
-          importance: NotificationImportance.Default,
-          playSound: false,
-          soundSource: null,
-          enableVibration: false,
-          enableLights: false,
-          channelGroupKey: "music_group",
-          channelShowBadge: false,
-        ),
-      ],
-      channelGroups: [
-        NotificationChannelGroup(
-          channelGroupKey: 'music_group',
-          channelGroupName: '音乐相关',
-        ),
-      ],
-    );
-    AwesomeNotifications().setListeners(
-      onActionReceivedMethod: onActionReceivedMethod,
-    );
+    if (Platform.isAndroid) {
+      try {
+        await _nativeChannel.invokeMethod('init');
+        _nativeEvents.receiveBroadcastStream().listen((event) async {
+          if (event is String) {
+            switch (event) {
+              case 'prev':
+                await playerService.previous();
+                break;
+              case 'play':
+                await playerService.play();
+                break;
+              case 'pause':
+                await playerService.pause();
+                break;
+              case 'next':
+                await playerService.next();
+                break;
+            }
+          }
+        });
+        _nativeAvailable = true;
+      } catch (_) {
+        _nativeAvailable = false;
+      }
+    }
     return this;
   }
 
@@ -99,34 +80,12 @@ class NotificationService extends GetxService {
         playerService.playing,
         playerService.currentCover,
         playerService.currentTitle,
-        playerService.currentLyricLine,
+        playerService.artists,
       ],
       (_) async {
-        // await checkAndRequestPermission();
-        updateNotification();
+        await checkAndRequestPermission();
+        await updateNotification();
       },
     );
-  }
-
-  @pragma("vm:entry-point")
-  static Future<void> onActionReceivedMethod(
-    ReceivedAction receivedAction,
-  ) async {
-    final playerService = Get.find<PlayerService>();
-    switch (receivedAction.buttonKeyPressed) {
-      case 'prev':
-        await playerService.previous();
-        break;
-      case 'play':
-        await playerService.play();
-        break;
-      case 'pause':
-        await playerService.pause();
-        break;
-      case 'next':
-        await playerService.next();
-        break;
-    }
-    // Your code goes here
   }
 }

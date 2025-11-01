@@ -9,6 +9,8 @@ class MainActivity : FlutterActivity() {
 
 	override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
 		super.configureFlutterEngine(flutterEngine)
+		// Register native notification channels (method + event)
+		NotificationModule.register(flutterEngine, this)
 		MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
 			.setMethodCallHandler { call, result ->
 				when (call.method) {
