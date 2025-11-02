@@ -296,6 +296,23 @@ object LyricsOverlayModule : MethodChannel.MethodCallHandler {
         try { permPollHandler?.removeCallbacksAndMessages(null) } catch (_: Exception) {}
     }
 
+    // Toggle overlay visibility for external triggers (e.g., notification action)
+    fun toggleOverlayVisibility() {
+        val v = containerRef?.get()
+        if (v == null) {
+            if (createOrUpdateOverlay()) showOverlay()
+            try { NotificationModule.sendActionEvent("overlay_shown") } catch (_: Exception) {}
+            return
+        }
+        if (v.visibility == View.VISIBLE) {
+            hideOverlay()
+            try { NotificationModule.sendActionEvent("overlay_hidden") } catch (_: Exception) {}
+        } else {
+            showOverlay()
+            try { NotificationModule.sendActionEvent("overlay_shown") } catch (_: Exception) {}
+        }
+    }
+
     private fun setClickThrough(enable: Boolean) {
         clickThrough = enable
         val p = params ?: return

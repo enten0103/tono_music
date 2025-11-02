@@ -266,6 +266,15 @@ class SettingsController extends GetxController {
     } catch (_) {}
   }
 
+  /// 同步原生侧变更
+  Future<void> syncOverlayVisible(bool visible) async {
+    overlayEnabled.value = visible;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('overlayEnabled', visible);
+    } catch (_) {}
+  }
+
   Future<void> setOverlayClickThrough(bool enable) async {
     overlayClickThrough.value = enable;
     final prefs = await SharedPreferences.getInstance();

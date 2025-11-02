@@ -100,10 +100,18 @@ jobs:
             echo "Signing secrets not provided — building unsigned artifacts"
           fi
 
-      - name: Build APK (multi-ABI release)
-        run: flutter build apk --release --target-platform android-arm,android-arm64 --split-per-abi
+      - name: Build APK (never fail)
+        id: build_apk
         shell: bash
-        continue-on-error: true
+        run: |
+          # Run build but don't fail this step; record exit code for debugging
+          set +e
+          flutter build apk --target-platform android-arm,android-arm64 --split-per-abi 
+          code=$?
+          echo "Build exit code: $code"
+          echo "build_exit_code=$code" >> $GITHUB_OUTPUT
+          # Always succeed; final failure will be decided by artifact verification
+          exit 0
 
       - name: Rename APKs to include tag/version
         if: always()

@@ -43,8 +43,9 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
     @Volatile private var eventSink: EventChannel.EventSink? = null
 
     // Avoid general bitmap caching per request; keep only last used cover to mitigate flicker
-    @Volatile private var lastCoverUrl: String? = null
+    @Volatile private var lastCoverUrl: String? = null // last requested URL
     @Volatile private var lastCoverBitmap: Bitmap? = null
+    @Volatile private var lastCoverBitmapUrl: String? = null // URL that current cached bitmap corresponds to
     @Volatile private var lastNotifyUptimeMs: Long = 0L
 
     fun register(flutterEngine: FlutterEngine, ctx: Context) {
@@ -199,9 +200,11 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
             setInt(R.id.btnPrev, "setColorFilter", titleColor)
             setInt(R.id.btnPlayPause, "setColorFilter", titleColor)
             setInt(R.id.btnNext, "setColorFilter", titleColor)
+            setInt(R.id.btnToggleOverlay, "setColorFilter", titleColor)
             setOnClickPendingIntent(R.id.btnPrev, pendingAction("prev"))
             setOnClickPendingIntent(R.id.btnPlayPause, pendingAction(if (playing) "pause" else "play"))
             setOnClickPendingIntent(R.id.btnNext, pendingAction("next"))
+            setOnClickPendingIntent(R.id.btnToggleOverlay, pendingAction("toggle_overlay"))
             // Set cover: show provided bitmap, else placeholder
             if (coverBitmap != null) {
                 setImageViewBitmap(R.id.ivCover, coverBitmap)
@@ -259,31 +262,32 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
         if (!hasNotificationPermission(ctx)) return
         try {
             val now = SystemClock.uptimeMillis()
-            // Preserve previous URL for correct fetch decision below
-            val previousUrl = lastCoverUrl
-            val cached: Bitmap? = if (coverUrl.isNotBlank() && coverUrl == previousUrl) lastCoverBitmap else null
-            // If we have cached cover for same URL, use it immediately to avoid placeholder flicker
-            nm.notify(NOTIFICATION_ID, buildNotification(title, text, playing, cached))
+            val requestedUrl = coverUrl.trim()
+            // Show previous bitmap while fetching the new one to avoid flicker
+            val displayBitmap: Bitmap? = lastCoverBitmap
+            nm.notify(NOTIFICATION_ID, buildNotification(title, text, playing, displayBitmap))
             lastNotifyUptimeMs = now
-            // Update current URL after initial notify
-            lastCoverUrl = coverUrl
+            // Remember the latest requested URL
+            lastCoverUrl = requestedUrl
         } catch (se: SecurityException) {
             // Permission might have been revoked between check & notify.
             // Gracefully ignore to satisfy lint and avoid crashes.
         }
 
-        // Load cover asynchronously and update (rounded corners), if not cached
-        val needFetch = coverUrl.isNotBlank() && (coverUrl != (lastCoverUrl ?: "") || lastCoverBitmap == null)
+        // Load cover asynchronously and update (rounded corners), while keeping previous bitmap visible
+        val needFetch = coverUrl.isNotBlank() && (coverUrl.trim() != (lastCoverBitmapUrl ?: ""))
         if (needFetch) {
             Thread {
-                val bmpRaw = fetchBitmap(coverUrl)
+                val req = coverUrl.trim()
+                val bmpRaw = fetchBitmap(req)
                 val radius = dp(ctx, 6).toFloat()
                 val bmp = bmpRaw?.let { roundedBitmap(it, radius) }
                 if (bmp != null) {
                     try {
-                        // Only update if the cover URL hasn't changed since
-                        if (coverUrl == lastCoverUrl) {
+                        // Only update if this request is still the latest
+                        if (req == lastCoverUrl) {
                             lastCoverBitmap = bmp
+                            lastCoverBitmapUrl = req
                             if (hasNotificationPermission(ctx)) {
                                 nm.notify(NOTIFICATION_ID, buildNotification(title, text, playing, bmp))
                             }

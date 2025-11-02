@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/app/services/player_service.dart';
+import 'package:tono_music/app/ui/settings/settings_controller.dart';
 
 @pragma("vm:entry-point")
 class NotificationService extends GetxService {
@@ -61,6 +62,16 @@ class NotificationService extends GetxService {
                 break;
               case 'next':
                 await playerService.next();
+                break;
+              case 'overlay_shown':
+                try {
+                  Get.find<SettingsController>().syncOverlayVisible(true);
+                } catch (_) {}
+                break;
+              case 'overlay_hidden':
+                try {
+                  Get.find<SettingsController>().syncOverlayVisible(false);
+                } catch (_) {}
                 break;
             }
           }
