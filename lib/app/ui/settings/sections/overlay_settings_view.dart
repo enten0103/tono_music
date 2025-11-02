@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -47,30 +49,36 @@ class OverlaySettingsView extends GetView<SettingsController> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Row(
+                  // 字体与字重改为上下两项：桌面端才显示字体选择；字重使用 SegmentedButton
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Row(
+                      if (Platform.isWindows ||
+                          Platform.isLinux ||
+                          Platform.isMacOS)
+                        Row(
                           children: [
                             const Text('字体：'),
                             const SizedBox(width: 8),
-                            Obx(() {
-                              final fonts = controller.systemFonts;
-                              final value = controller.overlayFontFamily.value;
-                              final fallback = const [
-                                'Segoe UI',
-                                'Arial',
-                                'Microsoft YaHei',
-                                'SimSun',
-                                'Times New Roman',
-                              ];
-                              final items = (fonts.isEmpty ? fallback : fonts)
-                                  .toList();
-                              if (!items.contains(value) && value.isNotEmpty) {
-                                items.insert(0, value);
-                              }
-                              return Expanded(
-                                child: DropdownButton<String>(
+                            Expanded(
+                              child: Obx(() {
+                                final fonts = controller.systemFonts;
+                                final value =
+                                    controller.overlayFontFamily.value;
+                                final fallback = const [
+                                  'Segoe UI',
+                                  'Arial',
+                                  'Microsoft YaHei',
+                                  'SimSun',
+                                  'Times New Roman',
+                                ];
+                                final items = (fonts.isEmpty ? fallback : fonts)
+                                    .toList();
+                                if (!items.contains(value) &&
+                                    value.isNotEmpty) {
+                                  items.insert(0, value);
+                                }
+                                return DropdownButton<String>(
                                   isExpanded: true,
                                   value: value,
                                   items: items
@@ -86,53 +94,51 @@ class OverlaySettingsView extends GetView<SettingsController> {
                                       controller.setOverlayFontFamily(v);
                                     }
                                   },
-                                ),
-                              );
-                            }),
+                                );
+                              }),
+                            ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 24),
-                      // 将“加粗”替换为字重选择
-                      Row(
-                        children: [
-                          const Text('字重'),
-                          const SizedBox(width: 8),
-                          Obx(() {
-                            final w = controller.overlayFontWeight.value;
-                            const options = <int>[500, 600, 900];
-                            String labelOf(int v) {
-                              switch (v) {
-                                case 500:
-                                  return '细';
-                                case 600:
-                                  return '粗';
-                                case 900:
-                                  return '特粗';
-                                default:
-                                  return '$v';
-                              }
-                            }
-
-                            return DropdownButton<int>(
-                              value: w,
-                              items: options
-                                  .map(
-                                    (v) => DropdownMenuItem(
-                                      value: v,
-                                      child: Text(labelOf(v)),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) {
-                                if (v != null) {
-                                  controller.setOverlayFontWeight(v);
+                      if (Platform.isWindows ||
+                          Platform.isLinux ||
+                          Platform.isMacOS)
+                        const SizedBox(height: 12),
+                      Obx(() {
+                        final w = controller.overlayFontWeight.value;
+                        final selected = <int>{w};
+                        return Row(
+                          children: [
+                            const Text('字重：'),
+                            const SizedBox(width: 8),
+                            SegmentedButton<int>(
+                              segments: const <ButtonSegment<int>>[
+                                ButtonSegment<int>(
+                                  value: 500,
+                                  label: Text('细'),
+                                ),
+                                ButtonSegment<int>(
+                                  value: 600,
+                                  label: Text('粗'),
+                                ),
+                                ButtonSegment<int>(
+                                  value: 900,
+                                  label: Text('特粗'),
+                                ),
+                              ],
+                              selected: selected,
+                              emptySelectionAllowed: false,
+                              multiSelectionEnabled: false,
+                              onSelectionChanged: (newSelection) {
+                                if (newSelection.isNotEmpty) {
+                                  controller.setOverlayFontWeight(
+                                    newSelection.first,
+                                  );
                                 }
                               },
-                            );
-                          }),
-                        ],
-                      ),
+                            ),
+                          ],
+                        );
+                      }),
                     ],
                   ),
                   const SizedBox(height: 12),

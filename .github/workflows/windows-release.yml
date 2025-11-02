@@ -1,10 +1,29 @@
 name: Build Windows
 
 on:
-  push:
-    branches: [ 'release/*', 'hotfix/*' ]
-    tags:     [ 'v*.*.*' ]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (optional)'
+        required: false
+      prerelease:
+        description: 'Mark as prerelease (optional)'
+        required: false
+        type: boolean
+      changelog:
+        description: 'Changelog (optional)'
+        required: false
+  workflow_call:
+    inputs:
+      version:
+        required: false
+        type: string
+      prerelease:
+        required: false
+        type: boolean
+      changelog:
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -24,28 +43,44 @@ jobs:
           fetch-depth: 0
       - id: meta
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+          INPUT_CHANGELOG: ${{ inputs.changelog }}
         run: |
           set -e
           ref="${GITHUB_REF}"
           ref_name="${GITHUB_REF_NAME}"
 
-          if [[ "$ref" == refs/tags/v* ]]; then
-            version="${ref_name#v}"
-            tag="$ref_name"
-            prerelease="false"
-            range_target="$tag"
-          else
-            if [[ "$ref" == refs/heads/release/* ]]; then
-              version="${ref_name#release/}"
-            elif [[ "$ref" == refs/heads/hotfix/* ]]; then
-              version="${ref_name#hotfix/}"
+          # Prefer explicit inputs when provided (workflow_call/manual dispatch)
+          if [[ -n "$INPUT_VERSION" ]]; then
+            version="$INPUT_VERSION"
+            tag="v${version}"
+            if [[ -n "$INPUT_PRERELEASE" ]]; then
+              prerelease="$INPUT_PRERELEASE"
             else
-              echo "Unsupported ref: $ref"
-              exit 1
+              prerelease="false"
             fi
-            tag="v${version}-rc.${GITHUB_RUN_NUMBER}"
-            prerelease="true"
             range_target="HEAD"
+          else
+            if [[ "$ref" == refs/tags/v* ]]; then
+              version="${ref_name#v}"
+              tag="$ref_name"
+              prerelease="false"
+              range_target="$tag"
+            else
+              # Fallback for manual runs without inputs: derive version from pubspec.yaml
+              if [[ -f pubspec.yaml ]]; then
+                version=$(grep '^version:' pubspec.yaml | head -n1 | awk '{print $2}' | tr -d '\r')
+                version=${version%%+*}
+              fi
+              if [[ -z "$version" ]]; then
+                version="0.0.0"
+              fi
+              tag="v${version}-manual.${GITHUB_RUN_NUMBER}"
+              prerelease="true"
+              range_target="HEAD"
+            fi
           fi
 
           if git describe --tags --abbrev=0 --match 'v[0-9]*' >/dev/null 2>&1; then
@@ -64,8 +99,12 @@ jobs:
           echo "tag=$tag"               >> $GITHUB_OUTPUT
           echo "prerelease=$prerelease" >> $GITHUB_OUTPUT
 
-          log="$(git log --pretty=format:'- %s (%h) — %an' $range || true)"
-          log="${log:-No changes.}"
+          if [[ -n "$INPUT_CHANGELOG" ]]; then
+            log="$INPUT_CHANGELOG"
+          else
+            log="$(git log --pretty=format:'- %s (%h) — %an' $range || true)"
+            log="${log:-No changes.}"
+          fi
           {
             echo 'changelog<<EOF'
             echo "$log"
@@ -98,12 +137,13 @@ jobs:
       - name: Create Windows portable ZIP
         env:
           APP_VERSION: ${{ needs.compute.outputs.version }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           $src = "build\windows\x64\runner\Release"
           if (!(Test-Path $src)) { throw "Windows Release output not found: $src" }
           $destDir = "build\portable"
           New-Item -ItemType Directory -Force -Path $destDir | Out-Null
-          $zip = Join-Path $destDir ("TonoMusic-Portable-" + $env:APP_VERSION + ".zip")
+          $zip = Join-Path $destDir ("TonoMusic-Portable-" + $env:APP_VERSION + "-" + $env:GITHUB_SHA + ".zip")
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path (Join-Path $src '*') -DestinationPath $zip
         shell: pwsh
@@ -116,10 +156,25 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\installer.iss"
         shell: pwsh
+      - name: Rename installer to include SHA
+        run: |
+          $dir = "build\installer"
+          if (Test-Path $dir) {
+            Get-ChildItem -Path $dir -Filter *.exe | ForEach-Object {
+              $name = [System.IO.Path]::GetFileNameWithoutExtension($_.Name)
+              $newName = "$name-${env:GITHUB_SHA}.exe"
+              $newPath = Join-Path $_.DirectoryName $newName
+              if ($_.FullName -ne $newPath) {
+                Write-Host "Renaming $($_.Name) -> $newName"
+                Move-Item -LiteralPath $_.FullName -Destination $newPath -Force
+              }
+            }
+          }
+        shell: pwsh
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-${{ needs.compute.outputs.tag }}
+          name: windows-${{ needs.compute.outputs.tag }}-${{ github.sha }}
           path: |
             build/installer/*.exe
             build/portable/*.zip

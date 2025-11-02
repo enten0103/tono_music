@@ -36,8 +36,8 @@ android {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a")
-            isUniversalApk = true
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            isUniversalApk = false 
         }
     }
 
@@ -66,8 +66,6 @@ flutter {
 }
 
 dependencies {
-    // For MediaStyle notifications (androidx.media.app.NotificationCompat)
-    implementation("androidx.media:media:1.7.0")
-    // For AppCompatTextView and AppCompat support used by overlay view
-    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.media:media:1.7.1")
+    implementation("androidx.appcompat:appcompat:1.7.1")
 }
