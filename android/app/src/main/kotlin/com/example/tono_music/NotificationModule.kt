@@ -74,7 +74,8 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
             }
             "isAllowed" -> {
                 val ctx = contextOrNull() ?: return result.error("no_context", "Context is null", null)
-                val allowed = NotificationManagerCompat.from(ctx).areNotificationsEnabled()
+                // Consider both channel toggle and runtime POST_NOTIFICATIONS on Android 13+
+                val allowed = hasNotificationPermission(ctx)
                 result.success(allowed)
             }
             "requestPermission" -> {
@@ -139,6 +140,7 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
     private fun buildNotification(title: String, text: String, playing: Boolean, coverBitmap: Bitmap? = null): Notification {
         val ctx = contextOrNull() ?: throw IllegalStateException("Context null")
     val (titleColor, textColor) = resolveNotificationTextColors(ctx)
+        val launchPi = launchAppPendingIntent()
         val builder = NotificationCompat.Builder(ctx, CHANNEL_ID)
             // Keep status bar small icon in sync with play state
             .setSmallIcon(if (playing) R.drawable.pause_24px else R.drawable.play_arrow_24px)
@@ -148,6 +150,8 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
             .setCategory(Notification.CATEGORY_TRANSPORT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_MAX)
+            // Tapping notification opens the app
+            .setContentIntent(launchPi)
 
         // Collapsed custom view (no outlined buttons)
         val collapsed = RemoteViews(ctx.packageName, R.layout.notification_media_collapsed).apply {
@@ -174,6 +178,10 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
             setOnClickPendingIntent(R.id.btnPrev, pendingAction("prev"))
             setOnClickPendingIntent(R.id.btnPlayPause, pendingAction(if (playing) "pause" else "play"))
             setOnClickPendingIntent(R.id.btnNext, pendingAction("next"))
+            // Tap on text area opens app
+            setOnClickPendingIntent(R.id.textContainer, launchPi)
+            setOnClickPendingIntent(R.id.tvTitle, launchPi)
+            setOnClickPendingIntent(R.id.tvText, launchPi)
         }
 
         // Expanded custom view (same controls, more space)
@@ -200,6 +208,10 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
             } else {
                 setImageViewResource(R.id.ivCover, R.mipmap.ic_launcher)
             }
+            // Tap on text area opens app
+            setOnClickPendingIntent(R.id.textContainer, launchPi)
+            setOnClickPendingIntent(R.id.tvTitle, launchPi)
+            setOnClickPendingIntent(R.id.tvText, launchPi)
         }
 
         builder.setCustomContentView(collapsed)
@@ -207,6 +219,19 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
         builder.setStyle(NotificationCompat.DecoratedCustomViewStyle())
 
         return builder.build()
+    }
+
+    private fun launchAppPendingIntent(): PendingIntent {
+        val ctx = contextOrNull() ?: throw IllegalStateException("Context null")
+        val pm = ctx.packageManager
+        val launch = pm.getLaunchIntentForPackage(ctx.packageName)
+            ?: Intent(ctx, MainActivity::class.java).apply {
+                action = Intent.ACTION_MAIN
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return PendingIntent.getActivity(ctx, 0, launch, flags)
     }
 
     private fun dp(ctx: Context, dp: Int): Int {
@@ -259,8 +284,12 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
                         // Only update if the cover URL hasn't changed since
                         if (coverUrl == lastCoverUrl) {
                             lastCoverBitmap = bmp
-                            nm.notify(NOTIFICATION_ID, buildNotification(title, text, playing, bmp))
+                            if (hasNotificationPermission(ctx)) {
+                                nm.notify(NOTIFICATION_ID, buildNotification(title, text, playing, bmp))
+                            }
                         }
+                    } catch (_: SecurityException) {
+                        // Handle explicit SecurityException as per lint guidance
                     } catch (_: Exception) { }
                 }
             }.start()
