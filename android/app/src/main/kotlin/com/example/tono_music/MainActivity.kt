@@ -26,4 +26,15 @@ class MainActivity : FlutterActivity() {
 			}
 	}
 
+	override fun onDestroy() {
+		super.onDestroy()
+		// When activity is removed (swipe away), dismiss notification and tear down overlay to avoid stale UI
+		try { NotificationModule.dismissPublic() } catch (_: Exception) {}
+		try { LyricsOverlayModule.teardown() } catch (_: Exception) {}
+	}
+	
+	override fun onBackPressed() {
+		super.onBackPressed()
+	}
+
 }

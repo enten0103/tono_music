@@ -288,6 +288,14 @@ object LyricsOverlayModule : MethodChannel.MethodCallHandler {
         didToastOnce = false
     }
 
+    // Public teardown for app lifecycle cleanup when activity is destroyed
+    fun teardown() {
+        try { destroyOverlay() } catch (_: Exception) {}
+        // stop permission polling if any
+        permPolling = false
+        try { permPollHandler?.removeCallbacksAndMessages(null) } catch (_: Exception) {}
+    }
+
     private fun setClickThrough(enable: Boolean) {
         clickThrough = enable
         val p = params ?: return

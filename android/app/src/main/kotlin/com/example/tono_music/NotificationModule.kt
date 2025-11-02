@@ -333,6 +333,11 @@ object NotificationModule : MethodChannel.MethodCallHandler, EventChannel.Stream
         }
     }
 
+    // Expose a safe public dismiss for app lifecycle teardown
+    fun dismissPublic() {
+        try { dismiss() } catch (_: Exception) {}
+    }
+
     fun sendActionEvent(action: String) {
         eventSink?.success(action)
     }
