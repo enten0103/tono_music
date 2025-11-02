@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/app/routes/app_routes.dart';
@@ -39,12 +37,6 @@ class SettingsView extends GetView<SettingsController> {
           subtitleBuilder: () => const Text('管理图片/URL/MUSIC缓存'),
           onTap: () => Get.toNamed(AppRoutes.settingsCache),
         ),
-        if (Platform.isAndroid)
-          _SettingsTile(
-            icon: Icons.notifications_outlined,
-            title: '通知设置',
-            onTap: () => Get.toNamed(AppRoutes.settingsNotifications),
-          ),
       ],
     );
   }
