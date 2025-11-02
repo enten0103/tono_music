@@ -59,7 +59,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   android:
-    name: Build Android APKs (multi-ABI)
+    name: Build Android 
     needs: compute
     runs-on: ubuntu-latest
     steps:
@@ -133,7 +133,7 @@ jobs:
           if-no-files-found: error
 
   windows:
-    name: Build Windows Installer
+    name: Build Windows
     needs: compute
     runs-on: windows-latest
     steps:

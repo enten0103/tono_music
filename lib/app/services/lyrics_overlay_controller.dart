@@ -96,6 +96,6 @@ class LyricsOverlayController extends GetxService {
 
   /// Toggle click-through via native channel helper.
   Future<bool> toggleClickThrough(bool enable) async {
-    return await LyricsOverlayService.instance.toggleClickThrough(enable);
+    return await LyricsOverlayService.instance.lock(enable);
   }
 }

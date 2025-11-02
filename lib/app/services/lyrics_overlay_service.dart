@@ -1,36 +1,29 @@
 import 'package:flutter/services.dart';
 
-/// Service to control a desktop lyrics overlay window behavior on Windows.
-///
-/// Provides a small API to toggle "click-through" so the overlay can allow
-/// mouse events to pass to underlying windows (useful for always-on-top lyrics).
 class LyricsOverlayService {
   LyricsOverlayService._();
+
   static final LyricsOverlayService instance = LyricsOverlayService._();
 
   static const MethodChannel _channel = MethodChannel(
     'com.enten0103.tono_music/window',
   );
 
-  bool _isClickThrough = false;
+  bool isLock = false;
 
-  /// Toggle click-through. Returns the resulting state (true = click-through enabled).
-  Future<bool> toggleClickThrough(bool enable) async {
+  Future<bool> lock(bool enable) async {
     try {
       final dynamic res = await _channel.invokeMethod(
         'setOverlayClickThrough',
         {'enabled': enable},
       );
       if (res is bool) {
-        _isClickThrough = res;
+        isLock = res;
       } else if (res != null) {
-        // Try to interpret non-bool responses conservatively.
-        _isClickThrough = res.toString().toLowerCase() == 'true';
+        isLock = res.toString().toLowerCase() == 'true';
       }
-    } on PlatformException {
-      // On error, keep previous state.
-    }
-    return _isClickThrough;
+    } catch (_) {}
+    return isLock;
   }
 
   Future<bool> create() async {
@@ -123,12 +116,12 @@ class LyricsOverlayService {
     }
   }
 
-  Future<bool> setFont(String family, num size) async {
+  Future<bool> setFontWeight(int weight) async {
     try {
-      // Apply family and size as two dedicated calls.
-      final ok1 = await setFontFamily(family);
-      final ok2 = await setFontSize(size);
-      return ok1 && ok2;
+      final res = await _channel.invokeMethod('setLyricsFontWeight', {
+        'weight': weight.toString(),
+      });
+      return res == true;
     } catch (_) {
       return false;
     }
@@ -145,21 +138,10 @@ class LyricsOverlayService {
     }
   }
 
-  Future<Map<String, dynamic>?> getStyle() async {
+  Future<bool> setTextOpacity(int alpha) async {
     try {
-      final res = await _channel.invokeMethod('getLyricsStyle');
-      if (res is Map) {
-        return Map<String, dynamic>.from(res);
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  Future<bool> setPosition(int x, int y) async {
-    try {
-      final res = await _channel.invokeMethod('setLyricsPosition', {
-        'x': x,
-        'y': y,
+      final res = await _channel.invokeMethod('setLyricsTextOpacity', {
+        'alpha': alpha.toString(),
       });
       return res == true;
     } catch (_) {
@@ -167,5 +149,51 @@ class LyricsOverlayService {
     }
   }
 
-  bool get isClickThrough => _isClickThrough;
+  Future<bool> setWidth(int width) async {
+    try {
+      final res = await _channel.invokeMethod('setOverlayWidth', {
+        'width': width.toString(),
+      });
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> setLines(int lines) async {
+    try {
+      final res = await _channel.invokeMethod('setOverlayLines', {
+        'lines': lines.toString(),
+      });
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> setStroke({required int width, required int color}) async {
+    try {
+      final res = await _channel.invokeMethod('setLyricsStroke', {
+        'width': width.toString(),
+        'color': '0x${color.toRadixString(16)}',
+      });
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> setTextAlign(String align) async {
+    try {
+      final v = align.toLowerCase();
+      final res = await _channel.invokeMethod('setLyricsTextAlign', {
+        'align': v,
+      });
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool get isClickThrough => isLock;
 }

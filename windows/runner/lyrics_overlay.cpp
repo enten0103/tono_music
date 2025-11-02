@@ -27,14 +27,27 @@ static int overlay_w = 600;
 static int overlay_h = 64;
 static ATOM overlay_class_atom = 0;
 // Current alpha value for layered window (0..255). Default to previous 230.
-static int overlay_alpha = 230;
+static int overlay_alpha = 30;
 static std::wstring overlay_font_family = L"Segoe UI";
 static int overlay_font_size = 14; // points
 static HFONT overlay_hfont = nullptr;
 // Bold flag for font weight
 static bool overlay_font_bold = false;
+// Explicit font weight (GDI FW_*) 100..900; defaults to 400
+static int overlay_font_weight = FW_NORMAL;
 // Text color for drawing (RGB). Default white.
 static COLORREF overlay_text_color = RGB(255, 255, 255);
+// Number of text lines to display (for wrapping). 1 = single line.
+static int overlay_lines = 1;
+// Padding inside text bitmap (both background and text layer).
+static int overlay_padding = 8;
+// Text opacity multiplier 0..255 (255 fully opaque, 0 fully transparent)
+static int overlay_text_opacity = 255;
+// Stroke settings
+static int overlay_stroke_width = 0; // 0 = no stroke
+static COLORREF overlay_stroke_color = RGB(0, 0, 0);
+// Text horizontal alignment: 0=left,1=center,2=right
+static int overlay_text_align = 0;
 
 // Forward declaration of logging helper (defined later).
 static void AppendOverlayLog(const std::string& s);
@@ -50,14 +63,19 @@ static void update_overlay_font() {
   int logpixely = GetDeviceCaps(hdc, LOGPIXELSY);
   ReleaseDC(NULL, hdc);
   int height = -MulDiv(overlay_font_size, logpixely, 72);
-  int weight = overlay_font_bold ? FW_BOLD : FW_NORMAL;
+  int weight = overlay_font_weight > 0 ? overlay_font_weight : (overlay_font_bold ? FW_BOLD : FW_NORMAL);
   overlay_hfont = CreateFontW(
       height, 0, 0, 0, weight, FALSE, FALSE, FALSE,
-      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-    ANTIALIASED_QUALITY, VARIABLE_PITCH | FF_DONTCARE,
+      DEFAULT_CHARSET,
+      OUT_TT_PRECIS,              // Prefer TrueType
+      CLIP_DEFAULT_PRECIS,
+      CLEARTYPE_NATURAL_QUALITY,  // Better weight rendering on LCD
+      DEFAULT_PITCH | FF_DONTCARE,
       overlay_font_family.c_str());
   std::ostringstream ss;
-  ss << "update_overlay_font: family='" << std::string("(wide)") << "' size=" << overlay_font_size << " bold=" << (overlay_font_bold?1:0);
+  ss << "update_overlay_font: size=" << overlay_font_size
+     << " weight=" << weight
+     << " family(wide) set";
   AppendOverlayLog(ss.str());
 }
 
@@ -80,6 +98,8 @@ static void AppendOverlayLog(const std::string& s) {
 static LRESULT CALLBACK OverlayWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 // Forward declare text layer updater
 static void update_text_layer();
+static void update_overlay_size_and_redraw();
+static int get_line_height_pixels();
 
 // Robust parsing helpers for EncodableValue -> int/bool/color
 static bool ParseIntFromEncodable(const flutter::EncodableValue* v, int& out) {
@@ -259,7 +279,8 @@ static bool create_overlay() {
   }
   if (overlay_text_hwnd) {
     // Keep same userdata pointer for text window
-    SetWindowLongPtr(overlay_text_hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(ptr));
+    // Avoid sharing the same heap pointer to prevent double free on WM_DESTROY.
+    SetWindowLongPtr(overlay_text_hwnd, GWLP_USERDATA, 0);
     ShowWindow(overlay_text_hwnd, SW_SHOWNOACTIVATE);
     AppendOverlayLog("create_overlay: text window created");
     // Push initial text content
@@ -305,7 +326,7 @@ static void update_text_layer() {
   if (w <= 0 || h <= 0) return;
 
   HDC screenDC = GetDC(NULL);
-  HDC memDC = CreateCompatibleDC(screenDC);
+  HDC memDC = CreateCompatibleDC(screenDC); // final composited output
 
   BITMAPINFO bmi = {};
   bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -320,7 +341,7 @@ static void update_text_layer() {
   bmi.bmiHeader.biCompression = BI_RGB;
 
   void* pvBits = nullptr;
-  HBITMAP hBitmap = CreateDIBSection(memDC, &bmi, DIB_RGB_COLORS, &pvBits, NULL, 0);
+  HBITMAP hBitmap = CreateDIBSection(memDC, &bmi, DIB_RGB_COLORS, &pvBits, NULL, 0); // output bitmap
   if (!hBitmap) {
     DeleteDC(memDC);
     ReleaseDC(NULL, screenDC);
@@ -370,63 +391,107 @@ static void update_text_layer() {
   HFONT oldf = nullptr;
   if (overlay_hfont) oldf = (HFONT)SelectObject(memDC, overlay_hfont);
 
-  // Draw text left/top
-  RECT tr = {0,0,w,h};
-  // Draw white text as a mask; we'll recolor below using premultiplied alpha.
-  SetTextColor(memDC, RGB(255,255,255));
-  DrawTextW(memDC, overlay_text.c_str(), -1, &tr, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+  // Prepare separate stroke and fill DIBs to build masks
+  HDC dcStroke = CreateCompatibleDC(screenDC);
+  HDC dcFill = CreateCompatibleDC(screenDC);
+  void* bitsStroke = nullptr;
+  void* bitsFill = nullptr;
+  HBITMAP bmpStroke = CreateDIBSection(dcStroke, &bmi, DIB_RGB_COLORS, &bitsStroke, NULL, 0);
+  HBITMAP bmpFill = CreateDIBSection(dcFill, &bmi, DIB_RGB_COLORS, &bitsFill, NULL, 0);
+  HGDIOBJ oldStrokeBmp = nullptr;
+  HGDIOBJ oldFillBmp = nullptr;
+  if (bmpStroke) oldStrokeBmp = SelectObject(dcStroke, bmpStroke);
+  if (bmpFill) oldFillBmp = SelectObject(dcFill, bmpFill);
+  // Clear stroke/fill surfaces
+  HBRUSH brushBlackStroke = CreateSolidBrush(RGB(0,0,0));
+  HBRUSH brushBlackFill = CreateSolidBrush(RGB(0,0,0));
+  FillRect(dcStroke, &r, brushBlackStroke); DeleteObject(brushBlackStroke);
+  FillRect(dcFill, &r, brushBlackFill); DeleteObject(brushBlackFill);
+  // Set common font
+  if (overlay_hfont) {
+    SelectObject(dcStroke, overlay_hfont);
+    SelectObject(dcFill, overlay_hfont);
+  }
+  SetBkMode(dcStroke, TRANSPARENT);
+  SetBkMode(dcFill, TRANSPARENT);
+  SetTextColor(dcStroke, RGB(255,255,255));
+  SetTextColor(dcFill, RGB(255,255,255));
+
+  RECT tr = {overlay_padding, overlay_padding, w - overlay_padding, h - overlay_padding};
+  UINT dtFlags = DT_NOPREFIX;
+  // horizontal alignment
+  if (overlay_text_align == 1) dtFlags |= DT_CENTER; else if (overlay_text_align == 2) dtFlags |= DT_RIGHT; else dtFlags |= DT_LEFT;
+  if (overlay_lines <= 1) dtFlags |= DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS; else dtFlags |= DT_WORDBREAK | DT_WORD_ELLIPSIS | DT_TOP;
+
+  // Draw stroke mask (if enabled): draw text at offsets within a disk radius
+  if (overlay_stroke_width > 0) {
+    int radsq = overlay_stroke_width * overlay_stroke_width;
+    for (int dy = -overlay_stroke_width; dy <= overlay_stroke_width; ++dy) {
+      for (int dx = -overlay_stroke_width; dx <= overlay_stroke_width; ++dx) {
+        if (dx*dx + dy*dy > radsq) continue;
+        RECT trs = {tr.left + dx, tr.top + dy, tr.right + dx, tr.bottom + dy};
+        DrawTextW(dcStroke, overlay_text.c_str(), -1, &trs, dtFlags);
+      }
+    }
+  }
+  // Draw fill mask (center)
+  DrawTextW(dcFill, overlay_text.c_str(), -1, &tr, dtFlags);
 
   if (oldf) SelectObject(memDC, oldf);
 
-  // Convert pixels: use the rendered grayscale mask (from white text) as alpha
-  // and apply the desired overlay_text_color with premultiplied alpha.
-  if (pvBits) {
-    uint8_t* pix = (uint8_t*)pvBits;
-    uint8_t desired_r = (uint8_t)GetRValue(overlay_text_color);
-    uint8_t desired_g = (uint8_t)GetGValue(overlay_text_color);
-    uint8_t desired_b = (uint8_t)GetBValue(overlay_text_color);
-    int alphaIndex = 3;
+  // Composite: stroke (bottom) then fill (top), writing premultiplied RGBA into pvBits
+  if (pvBits && bitsFill) {
+    uint8_t* out = (uint8_t*)pvBits;
+    uint8_t* pFill = (uint8_t*)bitsFill;
+    uint8_t* pStroke = (uint8_t*)bitsStroke;
+    uint8_t fill_r = (uint8_t)GetRValue(overlay_text_color);
+    uint8_t fill_g = (uint8_t)GetGValue(overlay_text_color);
+    uint8_t fill_b = (uint8_t)GetBValue(overlay_text_color);
+    uint8_t stroke_r = (uint8_t)GetRValue(overlay_stroke_color);
+    uint8_t stroke_g = (uint8_t)GetGValue(overlay_stroke_color);
+    uint8_t stroke_b = (uint8_t)GetBValue(overlay_stroke_color);
     for (int y = 0; y < h; ++y) {
       for (int x = 0; x < w; ++x) {
         int idx = (y * w + x) * 4;
-        uint8_t src_r = pix[idx + byteIndexR];
-        uint8_t src_g = pix[idx + byteIndexG];
-        uint8_t src_b = pix[idx + byteIndexB];
-        // compute mask intensity (grayscale). Use max channel to better capture subpixel AA.
-        uint8_t intensity = src_r;
-        if (src_g > intensity) intensity = src_g;
-        if (src_b > intensity) intensity = src_b;
-        uint8_t a = intensity; // 0..255
-        if (a == 0) {
-          // fully transparent
-          pix[idx + byteIndexB] = 0;
-          pix[idx + byteIndexG] = 0;
-          pix[idx + byteIndexR] = 0;
-          pix[idx + alphaIndex] = 0;
-        } else {
-          // premultiply desired color by alpha
-          uint8_t out_r = (uint8_t)((desired_r * (int)a + 127) / 255);
-          uint8_t out_g = (uint8_t)((desired_g * (int)a + 127) / 255);
-          uint8_t out_b = (uint8_t)((desired_b * (int)a + 127) / 255);
-          pix[idx + byteIndexR] = out_r;
-          pix[idx + byteIndexG] = out_g;
-          pix[idx + byteIndexB] = out_b;
-          pix[idx + alphaIndex] = a;
+        // alpha from masks (max channel)
+        uint8_t fsr = pFill[idx + byteIndexR];
+        uint8_t fsg = pFill[idx + byteIndexG];
+        uint8_t fsb = pFill[idx + byteIndexB];
+        uint8_t fA = fsr; if (fsg > fA) fA = fsg; if (fsb > fA) fA = fsb;
+        uint8_t ssr = 0, ssg = 0, ssb = 0; uint8_t sA = 0;
+        if (overlay_stroke_width > 0 && pStroke) {
+          ssr = pStroke[idx + byteIndexR];
+          ssg = pStroke[idx + byteIndexG];
+          ssb = pStroke[idx + byteIndexB];
+          sA = ssr; if (ssg > sA) sA = ssg; if (ssb > sA) sA = ssb;
         }
+        // apply text opacity to both
+        if (overlay_text_opacity < 255) {
+          fA = (uint8_t)((fA * overlay_text_opacity + 127) / 255);
+          sA = (uint8_t)((sA * overlay_text_opacity + 127) / 255);
+        }
+        // premultiplied colors
+        uint32_t out_r = 0, out_g = 0, out_b = 0, out_a = 0;
+        if (sA) {
+          out_r = (stroke_r * sA + 127) / 255;
+          out_g = (stroke_g * sA + 127) / 255;
+          out_b = (stroke_b * sA + 127) / 255;
+          out_a = sA;
+        }
+        if (fA) {
+          // over: fill over stroke
+          uint32_t inv = 255 - fA;
+          uint32_t nr = (fill_r * fA + (out_r * inv)) / 255;
+          uint32_t ng = (fill_g * fA + (out_g * inv)) / 255;
+          uint32_t nb = (fill_b * fA + (out_b * inv)) / 255;
+          uint32_t na = fA + (out_a * inv) / 255;
+          out_r = nr; out_g = ng; out_b = nb; out_a = na;
+        }
+        out[idx + byteIndexR] = (uint8_t)out_r;
+        out[idx + byteIndexG] = (uint8_t)out_g;
+        out[idx + byteIndexB] = (uint8_t)out_b;
+        out[idx + 3] = (uint8_t)out_a; // alpha index is always 3
       }
-    }
-    // Log a sample pixel after conversion (center)
-    int cx = w/2;
-    int cy = h/2;
-    if (cx >= 0 && cy >= 0 && cx < w && cy < h) {
-      int cidx = (cy * w + cx) * 4;
-      uint8_t p0 = ((uint8_t*)pvBits)[cidx + 0];
-      uint8_t p1 = ((uint8_t*)pvBits)[cidx + 1];
-      uint8_t p2 = ((uint8_t*)pvBits)[cidx + 2];
-      uint8_t p3 = ((uint8_t*)pvBits)[cidx + 3];
-      std::ostringstream ssp;
-      ssp << "update_text_layer: sample pixel after conv idx=" << cidx << " bytes=[" << (int)p0 << "," << (int)p1 << "," << (int)p2 << "," << (int)p3 << "]";
-      AppendOverlayLog(ssp.str());
     }
   }
 
@@ -443,6 +508,14 @@ static void update_text_layer() {
   HDC hdcScreen = GetDC(NULL);
   BOOL ok = UpdateLayeredWindow(overlay_text_hwnd, hdcScreen, &ptDst, &sizeWnd, memDC, &ptSrc, 0, &bf, ULW_ALPHA);
   ReleaseDC(NULL, hdcScreen);
+
+  // Cleanup temp DC/bitmaps
+  if (oldStrokeBmp) SelectObject(dcStroke, oldStrokeBmp);
+  if (oldFillBmp) SelectObject(dcFill, oldFillBmp);
+  if (bmpStroke) DeleteObject(bmpStroke);
+  if (bmpFill) DeleteObject(bmpFill);
+  DeleteDC(dcStroke);
+  DeleteDC(dcFill);
 
   SelectObject(memDC, oldBmp);
   DeleteObject(hBitmap);
@@ -471,6 +544,12 @@ static void set_overlay_clickthrough(bool enable) {
     LONG_PTR ex = GetWindowLongPtr(overlay_hwnd, GWL_EXSTYLE);
     if (enable) SetWindowLongPtr(overlay_hwnd, GWL_EXSTYLE, ex | WS_EX_TRANSPARENT);
     else SetWindowLongPtr(overlay_hwnd, GWL_EXSTYLE, ex & ~WS_EX_TRANSPARENT);
+    // Adjust background opacity: locked -> fully transparent, unlocked -> restore configured alpha
+    if (enable) {
+      SetLayeredWindowAttributes(overlay_hwnd, 0, (BYTE)0, LWA_ALPHA);
+    } else {
+      SetLayeredWindowAttributes(overlay_hwnd, 0, (BYTE)overlay_alpha, LWA_ALPHA);
+    }
   }
   if (overlay_text_hwnd) {
     LONG_PTR ex2 = GetWindowLongPtr(overlay_text_hwnd, GWL_EXSTYLE);
@@ -502,6 +581,35 @@ static void set_overlay_opacity_impl(int alpha) {
 // External API wrapper
 void SetLyricsOverlayOpacity(int alpha) {
   set_overlay_opacity_impl(alpha);
+}
+
+// Calculates line height in pixels for current font (includes external leading).
+static int get_line_height_pixels() {
+  int line_h = 16; // fallback
+  HDC hdc = GetDC(NULL);
+  HFONT old = nullptr;
+  if (overlay_hfont) old = (HFONT)SelectObject(hdc, overlay_hfont);
+  TEXTMETRIC tm = {};
+  if (GetTextMetrics(hdc, &tm)) {
+    line_h = tm.tmHeight + tm.tmExternalLeading;
+  }
+  if (old) SelectObject(hdc, old);
+  ReleaseDC(NULL, hdc);
+  return line_h;
+}
+
+// Recompute overlay height from width and lines, resize windows, and redraw.
+static void update_overlay_size_and_redraw() {
+  int line_h = get_line_height_pixels();
+  int desired_h = overlay_padding * 2 + (overlay_lines <= 1 ? line_h : line_h * overlay_lines);
+  overlay_h = desired_h;
+  if (overlay_hwnd) {
+    MoveWindow(overlay_hwnd, overlay_x, overlay_y, overlay_w, overlay_h, TRUE);
+  }
+  if (overlay_text_hwnd) {
+    MoveWindow(overlay_text_hwnd, overlay_x, overlay_y, overlay_w, overlay_h, TRUE);
+    update_text_layer();
+  }
 }
 
 // Window proc implementation
@@ -625,6 +733,52 @@ void RegisterLyricsOverlayChannel(flutter::BinaryMessenger* messenger,
           result->Success(flutter::EncodableValue(true));
           return;
         }
+        if (method == "setOverlayWidth") {
+          int parsed = -1;
+          if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
+            auto it = map->find(flutter::EncodableValue("width"));
+            if (it != map->end()) {
+              if (const std::string* ss = std::get_if<std::string>(&it->second)) {
+                try { parsed = std::stoi(*ss); } catch (...) { parsed = -1; }
+              } else if (const int64_t* pi = std::get_if<int64_t>(&it->second)) {
+                parsed = (int)*pi;
+              } else if (const double* pd = std::get_if<double>(&it->second)) {
+                parsed = (int)std::round(*pd);
+              }
+            }
+          }
+          if (parsed > 0) {
+            overlay_w = parsed;
+            update_overlay_size_and_redraw();
+            result->Success(flutter::EncodableValue(true));
+            return;
+          }
+          result->Error("bad_args", "Expected {width: int}");
+          return;
+        }
+        if (method == "setOverlayLines") {
+          int parsed = -1;
+          if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
+            auto it = map->find(flutter::EncodableValue("lines"));
+            if (it != map->end()) {
+              if (const std::string* ss = std::get_if<std::string>(&it->second)) {
+                try { parsed = std::stoi(*ss); } catch (...) { parsed = -1; }
+              } else if (const int64_t* pi = std::get_if<int64_t>(&it->second)) {
+                parsed = (int)*pi;
+              } else if (const double* pd = std::get_if<double>(&it->second)) {
+                parsed = (int)std::round(*pd);
+              }
+            }
+          }
+          if (parsed > 0) {
+            overlay_lines = parsed;
+            update_overlay_size_and_redraw();
+            result->Success(flutter::EncodableValue(true));
+            return;
+          }
+          result->Error("bad_args", "Expected {lines: int>0}");
+          return;
+        }
         if (method == "setLyricsText") {
           if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
             auto it = map->find(flutter::EncodableValue("text"));
@@ -651,6 +805,7 @@ void RegisterLyricsOverlayChannel(flutter::BinaryMessenger* messenger,
             overlay_font_family = wstrTo;
             update_overlay_font();
             if (overlay_hwnd) InvalidateRect(overlay_hwnd, NULL, TRUE);
+            update_overlay_size_and_redraw();
             result->Success(flutter::EncodableValue(true));
             return;
           }
@@ -682,10 +837,62 @@ void RegisterLyricsOverlayChannel(flutter::BinaryMessenger* messenger,
             overlay_font_size = parsed;
             update_overlay_font();
             if (overlay_hwnd) InvalidateRect(overlay_hwnd, NULL, TRUE);
+            update_overlay_size_and_redraw();
             result->Success(flutter::EncodableValue(true));
             return;
           }
           result->Error("bad_args", "Expected fontSize (int|string)");
+          return;
+        }
+
+        if (method == "setLyricsFontWeight") {
+          int weight = -1;
+          if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
+            auto it = map->find(flutter::EncodableValue("weight"));
+            if (it != map->end()) {
+              if (const std::string* ss = std::get_if<std::string>(&it->second)) {
+                try { weight = std::stoi(*ss); } catch (...) { weight = -1; }
+                if (weight < 1) {
+                  std::string v = *ss; for (auto &c : v) c = (char)tolower(c);
+                  // English names
+                  if (v == "thin" || v == "hairline") weight = 100;
+                  else if (v == "extralight" || v == "ultralight") weight = 200;
+                  else if (v == "light") weight = 300;
+                  else if (v == "regular" || v == "normal") weight = 400;
+                  else if (v == "medium") weight = 500;
+                  else if (v == "semibold" || v == "demibold") weight = 600;
+                  else if (v == "bold") weight = 700;
+                  else if (v == "extrabold" || v == "ultrabold") weight = 800;
+                  else if (v == "black" || v == "heavy") weight = 900;
+                  // Chinese aliases (best-effort mapping)
+                  else if (v == "极细" || v == "超细") weight = 100;
+                  else if (v == "纤细") weight = 200;
+                  else if (v == "细") weight = 300;
+                  else if (v == "常规" || v == "正常") weight = 400;
+                  else if (v == "中" || v == "中等") weight = 500;
+                  else if (v == "半粗" || v == "中粗") weight = 600;
+                  else if (v == "粗" || v == "加粗") weight = 700;
+                  else if (v == "特粗" || v == "超粗") weight = 800;
+                  else if (v == "黑" || v == "重" || v == "黑体") weight = 900;
+                }
+              } else if (const int64_t* pi = std::get_if<int64_t>(&it->second)) {
+                weight = (int)*pi;
+              } else if (const double* pd = std::get_if<double>(&it->second)) {
+                weight = (int)std::round(*pd);
+              }
+            }
+          }
+          if (weight > 0) {
+            if (weight < 100) weight = 100; if (weight > 900) weight = 900;
+            overlay_font_weight = weight;
+            overlay_font_bold = (weight >= 700);
+            update_overlay_font();
+            if (overlay_hwnd) InvalidateRect(overlay_hwnd, NULL, TRUE);
+            update_overlay_size_and_redraw();
+            result->Success(flutter::EncodableValue(true));
+            return;
+          }
+          result->Error("bad_args", "Expected {weight: 100..900 | named}");
           return;
         }
 
@@ -793,8 +1000,10 @@ void RegisterLyricsOverlayChannel(flutter::BinaryMessenger* messenger,
           }
           if (parsed) {
             overlay_font_bold = bval;
+            overlay_font_weight = bval ? FW_BOLD : FW_NORMAL;
             update_overlay_font();
             if (overlay_hwnd) InvalidateRect(overlay_hwnd, NULL, TRUE);
+            update_overlay_size_and_redraw();
             result->Success(flutter::EncodableValue(true));
             return;
           }
@@ -839,10 +1048,88 @@ void RegisterLyricsOverlayChannel(flutter::BinaryMessenger* messenger,
             if (it != map->end()) {
               if (const std::string* alpha = std::get_if<std::string>(&it->second)) {
                 set_overlay_opacity_impl(std::stoi(*alpha));
-                result->Success(flutter::EncodableValue(*alpha));
+                result->Success(flutter::EncodableValue(true));
                 return;
               }
             }
+          }
+          result->Error("bad_args", "Expected {alpha: int}");
+          return;
+        }
+
+        if (method == "setLyricsStroke") {
+          int wpx = -1; int rgb = -1;
+          if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
+            auto itw = map->find(flutter::EncodableValue("width"));
+            auto itc = map->find(flutter::EncodableValue("color"));
+            if (itw != map->end()) {
+              if (const int64_t* pi = std::get_if<int64_t>(&itw->second)) wpx = (int)*pi;
+              else if (const std::string* ss = std::get_if<std::string>(&itw->second)) { try { wpx = std::stoi(*ss);} catch(...) { wpx = -1; } }
+              else if (const double* pd = std::get_if<double>(&itw->second)) wpx = (int)std::round(*pd);
+            }
+            if (itc != map->end()) {
+              if (const std::string* cs = std::get_if<std::string>(&itc->second)) {
+                try { std::string s=*cs; if(!s.empty()&&s[0]=='#') s=s.substr(1); if (s.rfind("0x",0)==0||s.rfind("0X",0)==0) s=s.substr(2); rgb=(int)std::stoul(s,nullptr,16)&0xFFFFFF; } catch(...) { rgb=-1; }
+              } else if (const int64_t* pi = std::get_if<int64_t>(&itc->second)) rgb = (int)(*pi & 0xFFFFFF);
+              else { ParseColorFromEncodable(&itc->second, rgb); }
+            }
+          }
+          if (wpx >= 0 && rgb >= 0) {
+            if (wpx > 20) wpx = 20;
+            overlay_stroke_width = wpx;
+            overlay_stroke_color = RGB((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+            update_text_layer();
+            result->Success(flutter::EncodableValue(true));
+            return;
+          }
+          result->Error("bad_args", "Expected {width:int>=0,color:int|string}");
+          return;
+        }
+
+        if (method == "setLyricsTextAlign") {
+          int align = -1;
+          if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
+            auto it = map->find(flutter::EncodableValue("align"));
+            if (it != map->end()) {
+              if (const std::string* s = std::get_if<std::string>(&it->second)) {
+                std::string v = *s; for (auto &c : v) c = (char)tolower(c);
+                if (v == "left") align = 0; else if (v == "center" || v == "centre") align = 1; else if (v == "right") align = 2;
+              } else if (const int64_t* pi = std::get_if<int64_t>(&it->second)) {
+                align = (int)*pi; if (align < 0 || align > 2) align = -1;
+              }
+            }
+          }
+          if (align >= 0) {
+            overlay_text_align = align;
+            update_text_layer();
+            if (overlay_hwnd) InvalidateRect(overlay_hwnd, NULL, TRUE);
+            result->Success(flutter::EncodableValue(true));
+            return;
+          }
+          result->Error("bad_args", "Expected {align: 'left'|'center'|'right'|0|1|2}");
+          return;
+        }
+
+        if (method == "setLyricsTextOpacity") {
+          int parsed = -1;
+          if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
+            auto it = map->find(flutter::EncodableValue("alpha"));
+            if (it != map->end()) {
+              if (const std::string* ss = std::get_if<std::string>(&it->second)) {
+                try { parsed = std::stoi(*ss); } catch (...) { parsed = -1; }
+              } else if (const int64_t* pi = std::get_if<int64_t>(&it->second)) {
+                parsed = (int)*pi;
+              } else if (const double* pd = std::get_if<double>(&it->second)) {
+                parsed = (int)std::round(*pd);
+              }
+            }
+          }
+          if (parsed >= 0) {
+            if (parsed < 0) parsed = 0; if (parsed > 255) parsed = 255;
+            overlay_text_opacity = parsed;
+            update_text_layer();
+            result->Success(flutter::EncodableValue(true));
+            return;
           }
           result->Error("bad_args", "Expected {alpha: int}");
           return;

@@ -30,10 +30,20 @@ class SettingsController extends GetxController {
   final RxBool overlayEnabled = false.obs;
   final RxBool overlayClickThrough = false.obs;
   final RxInt overlayFontSize = 20.obs;
-  final RxInt overlayBgOpacity = 200.obs;
+  // 背景不透明度改为锁定，新增文字不透明度
+  final RxInt overlayTextOpacity = 255.obs;
   final RxString overlayFontFamily = 'Segoe UI'.obs;
-  final RxBool overlayFontBold = false.obs;
+  // 字重：100..900，默认 400
+  final RxInt overlayFontWeight = 400.obs;
   final RxInt overlayTextColor = 0xFFFFFF.obs;
+  // 新增：悬浮层尺寸与行数
+  final RxInt overlayWidth = 600.obs;
+  final RxInt overlayLines = 1.obs;
+  // 文字描边设置
+  final RxInt overlayStrokeWidth = 0.obs; // 0 关闭
+  final RxInt overlayStrokeColor = 0x000000.obs;
+  // 文本对齐: left/center/right
+  final RxString overlayTextAlign = 'left'.obs;
   // 全局字体设置
   final RxString globalFontFamily = 'Segoe UI'.obs;
   // 系统字体列表
@@ -136,11 +146,31 @@ class SettingsController extends GetxController {
     overlayEnabled.value = prefs.getBool('overlayEnabled') ?? false;
     overlayClickThrough.value = prefs.getBool('overlayClickThrough') ?? false;
     overlayFontSize.value = prefs.getInt('overlayFontSize') ?? 20;
-    overlayBgOpacity.value = prefs.getInt('overlayBgOpacity') ?? 200;
+    // 兼容旧的背景不透明度字段，优先读取新的文字不透明度
+    final int? textOpacityPref = prefs.getInt('overlayTextOpacity');
+    if (textOpacityPref != null) {
+      overlayTextOpacity.value = textOpacityPref.clamp(0, 255);
+    } else {
+      final int oldBg = prefs.getInt('overlayBgOpacity') ?? 255;
+      overlayTextOpacity.value = oldBg.clamp(0, 255);
+    }
     overlayFontFamily.value =
         prefs.getString('overlayFontFamily') ?? 'Segoe UI';
-    overlayFontBold.value = prefs.getBool('overlayFontBold') ?? false;
+    final weightPref = prefs.getInt('overlayFontWeight');
+    if (weightPref != null) {
+      overlayFontWeight.value = weightPref.clamp(100, 900);
+    } else {
+      overlayFontWeight.value = 400;
+    }
     overlayTextColor.value = prefs.getInt('overlayTextColor') ?? 0xFFFFFF;
+    overlayWidth.value = (prefs.getInt('overlayWidth') ?? 600).clamp(200, 1920);
+    overlayLines.value = (prefs.getInt('overlayLines') ?? 1).clamp(1, 10);
+    overlayStrokeWidth.value = (prefs.getInt('overlayStrokeWidth') ?? 0).clamp(
+      0,
+      20,
+    );
+    overlayStrokeColor.value = prefs.getInt('overlayStrokeColor') ?? 0x000000;
+    overlayTextAlign.value = prefs.getString('overlayTextAlign') ?? 'left';
 
     // If overlay is enabled, ensure native window exists and apply style
     if (overlayEnabled.value) {
@@ -152,20 +182,30 @@ class SettingsController extends GetxController {
           await LyricsOverlayService.instance.setFontSize(
             overlayFontSize.value,
           );
-          await LyricsOverlayService.instance.setOpacity(
-            overlayBgOpacity.value,
-          );
+          // 背景不透明度锁定，不在 UI 调整；可保留默认或用历史值，仅一次性设置
           await LyricsOverlayService.instance.setFontFamily(
             overlayFontFamily.value,
           );
-          await LyricsOverlayService.instance.setBold(overlayFontBold.value);
+          await LyricsOverlayService.instance.setFontWeight(
+            overlayFontWeight.value,
+          );
           await LyricsOverlayService.instance.setTextColor(
             overlayTextColor.value,
           );
+          await LyricsOverlayService.instance.setTextOpacity(
+            overlayTextOpacity.value,
+          );
+          await LyricsOverlayService.instance.setWidth(overlayWidth.value);
+          await LyricsOverlayService.instance.setLines(overlayLines.value);
+          await LyricsOverlayService.instance.setStroke(
+            width: overlayStrokeWidth.value,
+            color: overlayStrokeColor.value,
+          );
+          await LyricsOverlayService.instance.setTextAlign(
+            overlayTextAlign.value,
+          );
         } catch (_) {}
-        await LyricsOverlayService.instance.toggleClickThrough(
-          overlayClickThrough.value,
-        );
+        await LyricsOverlayService.instance.lock(overlayClickThrough.value);
       } catch (_) {}
     }
   }
@@ -201,13 +241,29 @@ class SettingsController extends GetxController {
           await LyricsOverlayService.instance.setFontSize(
             overlayFontSize.value,
           );
-          await LyricsOverlayService.instance.setOpacity(
-            overlayBgOpacity.value,
+          await LyricsOverlayService.instance.setFontFamily(
+            overlayFontFamily.value,
+          );
+          await LyricsOverlayService.instance.setFontWeight(
+            overlayFontWeight.value,
+          );
+          await LyricsOverlayService.instance.setTextColor(
+            overlayTextColor.value,
+          );
+          await LyricsOverlayService.instance.setTextOpacity(
+            overlayTextOpacity.value,
+          );
+          await LyricsOverlayService.instance.setWidth(overlayWidth.value);
+          await LyricsOverlayService.instance.setLines(overlayLines.value);
+          await LyricsOverlayService.instance.setStroke(
+            width: overlayStrokeWidth.value,
+            color: overlayStrokeColor.value,
+          );
+          await LyricsOverlayService.instance.setTextAlign(
+            overlayTextAlign.value,
           );
         } catch (_) {}
-        await LyricsOverlayService.instance.toggleClickThrough(
-          overlayClickThrough.value,
-        );
+        await LyricsOverlayService.instance.lock(overlayClickThrough.value);
       } else {
         await LyricsOverlayService.instance.hide();
       }
@@ -219,7 +275,7 @@ class SettingsController extends GetxController {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('overlayClickThrough', enable);
     try {
-      await LyricsOverlayService.instance.toggleClickThrough(enable);
+      await LyricsOverlayService.instance.lock(enable);
     } catch (_) {}
   }
 
@@ -232,12 +288,16 @@ class SettingsController extends GetxController {
     } catch (_) {}
   }
 
-  Future<void> setOverlayFontBold(bool bold) async {
-    overlayFontBold.value = bold;
+  Future<void> setOverlayFontWeight(int weight) async {
+    final w = weight.clamp(100, 900);
+    overlayFontWeight.value = w;
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('overlayFontBold', bold);
+    await prefs.setInt('overlayFontWeight', overlayFontWeight.value);
     try {
-      await LyricsOverlayService.instance.setBold(bold);
+      await LyricsOverlayService.instance.setFontWeight(
+        overlayFontWeight.value,
+      );
     } catch (_) {}
   }
 
@@ -259,12 +319,67 @@ class SettingsController extends GetxController {
     } catch (_) {}
   }
 
-  Future<void> setOverlayBgOpacity(int opacity) async {
-    overlayBgOpacity.value = opacity;
+  Future<void> setOverlayTextOpacity(int opacity) async {
+    overlayTextOpacity.value = opacity.clamp(0, 255);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('overlayBgOpacity', opacity);
+    await prefs.setInt('overlayTextOpacity', overlayTextOpacity.value);
     try {
-      await LyricsOverlayService.instance.setOpacity(opacity);
+      await LyricsOverlayService.instance.setTextOpacity(
+        overlayTextOpacity.value,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> setOverlayWidth(int width) async {
+    // 由界面传入屏幕最大宽度；此处不再强行限制到 1920
+    overlayWidth.value = width.clamp(200, 10000);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('overlayWidth', overlayWidth.value);
+    try {
+      await LyricsOverlayService.instance.setWidth(overlayWidth.value);
+    } catch (_) {}
+  }
+
+  Future<void> setOverlayLines(int lines) async {
+    overlayLines.value = lines.clamp(1, 10);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('overlayLines', overlayLines.value);
+    try {
+      await LyricsOverlayService.instance.setLines(overlayLines.value);
+    } catch (_) {}
+  }
+
+  Future<void> setOverlayStrokeWidth(int width) async {
+    overlayStrokeWidth.value = width.clamp(0, 20);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('overlayStrokeWidth', overlayStrokeWidth.value);
+    try {
+      await LyricsOverlayService.instance.setStroke(
+        width: overlayStrokeWidth.value,
+        color: overlayStrokeColor.value,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> setOverlayStrokeColor(int rgb) async {
+    overlayStrokeColor.value = rgb & 0xFFFFFF;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('overlayStrokeColor', overlayStrokeColor.value);
+    try {
+      await LyricsOverlayService.instance.setStroke(
+        width: overlayStrokeWidth.value,
+        color: overlayStrokeColor.value,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> setOverlayTextAlign(String align) async {
+    final v = (align == 'center' || align == 'right') ? align : 'left';
+    overlayTextAlign.value = v;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('overlayTextAlign', v);
+    try {
+      await LyricsOverlayService.instance.setTextAlign(v);
     } catch (_) {}
   }
 

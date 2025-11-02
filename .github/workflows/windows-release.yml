@@ -1,4 +1,4 @@
-name: Windows Release (GitFlow)
+name: Build Windows
 
 on:
   push:
