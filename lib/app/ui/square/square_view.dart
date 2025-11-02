@@ -5,11 +5,13 @@ import 'package:get/get.dart';
 import 'package:tono_music/app/widgets/play_list_card.dart';
 import 'square_controller.dart';
 import '../root/root_controller.dart';
-import 'package:flutter/rendering.dart';
 import '../../routes/app_routes.dart';
 
 class SquareView extends GetView<SquareController> {
   const SquareView({super.key});
+
+  // 默认的网格子项主轴高度（非 Windows 或无法计算时的回退）
+  static const double _kGridItemMainExtent = 232.0;
 
   @override
   Widget build(BuildContext context) {
@@ -99,35 +101,68 @@ class SquareView extends GetView<SquareController> {
           return const Expanded(child: Center(child: Text('暂无歌单')));
         }
         final width = MediaQuery.of(context).size.width;
-        final crossAxisCount = width >= 1200
-            ? 6
-            : width >= 1000
-            ? 5
-            : width >= 800
-            ? 4
-            : width >= 600
-            ? 3
-            : 2;
+        // 扩展到 4K 视口的列数映射（可按实际卡片尺寸再微调）
+        final int crossAxisCount;
+        if (width >= 3840) {
+          crossAxisCount = 13;
+        } else if (width >= 3200) {
+          crossAxisCount = 12;
+        } else if (width >= 2880) {
+          crossAxisCount = 11;
+        } else if (width >= 2560) {
+          crossAxisCount = 10;
+        } else if (width >= 2240) {
+          crossAxisCount = 9;
+        } else if (width >= 1920) {
+          crossAxisCount = 8;
+        } else if (width >= 1600) {
+          crossAxisCount = 7;
+        } else if (width >= 1366) {
+          crossAxisCount = 6;
+        } else if (width >= 1000) {
+          crossAxisCount = 5;
+        } else if (width >= 800) {
+          crossAxisCount = 4;
+        } else if (width >= 600) {
+          crossAxisCount = 4; // 加上底部 mini player，视觉密度更好
+        } else {
+          crossAxisCount = 2;
+        }
+
+        double mainExtent = _kGridItemMainExtent;
+        if (Platform.isWindows) {
+          const double padding = 12.0;
+          const double spacing = 6.0;
+          const double aspect = 0.8;
+          final double gridWidth = width - padding * 2;
+          final double itemWidth =
+              (gridWidth - spacing * (crossAxisCount - 1)) / crossAxisCount;
+          if (itemWidth.isFinite && itemWidth > 0) {
+            mainExtent = itemWidth / aspect;
+          }
+        }
         return Expanded(
           child: RefreshIndicator(
             onRefresh: controller.refresh,
             child: NotificationListener<ScrollNotification>(
               onNotification: (n) {
-                // 如果滚动停止并已到底部，加载更多
                 if (n is ScrollEndNotification) {
                   final m = n.metrics;
                   if (m.pixels >= m.maxScrollExtent - 100) {
                     controller.loadMore();
                   }
                 }
-                // 检测滚动方向，向上隐藏顶部/底部，向下显示
-                if (n is UserScrollNotification) {
+                if ((Platform.isAndroid || Platform.isIOS)) {
                   final root = Get.find<RootController>();
-                  if (n.direction == ScrollDirection.reverse &&
-                      (Platform.isAndroid || Platform.isIOS)) {
-                    root.setShowBars(false);
-                  } else if (n.direction == ScrollDirection.forward) {
-                    root.setShowBars(true);
+                  if (n is ScrollUpdateNotification &&
+                      n.metrics.axis == Axis.vertical) {
+                    final dy = n.scrollDelta ?? 0;
+                    const kTrigger = 16.0;
+                    if (dy > kTrigger) {
+                      root.setShowBottom(false);
+                    } else if (dy < -kTrigger) {
+                      root.setShowBottom(true);
+                    }
                   }
                 }
                 return false;
@@ -141,7 +176,8 @@ class SquareView extends GetView<SquareController> {
                         crossAxisCount: crossAxisCount,
                         mainAxisSpacing: 6,
                         crossAxisSpacing: 6,
-                        childAspectRatio: 0.72,
+                        // 固定主轴高度（Windows 按视口宽度自适应计算，其他平台用默认值）
+                        mainAxisExtent: mainExtent,
                       ),
                       delegate: SliverChildBuilderDelegate((context, i) {
                         final playlist = playlists[i];
@@ -161,18 +197,27 @@ class SquareView extends GetView<SquareController> {
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Center(
                         child: Obx(() {
-                          if (controller.hasMore) {
-                            return const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            );
-                          } else {
-                            return Text(
-                              '没有更多了',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            );
-                          }
+                          return AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            child: controller.hasMore
+                                ? const SizedBox(
+                                    key: ValueKey('loading'),
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    '没有更多了',
+                                    key: const ValueKey('end'),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                          );
                         }),
                       ),
                     ),

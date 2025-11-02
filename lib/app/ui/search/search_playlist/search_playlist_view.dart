@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tono_music/app/widgets/play_list_card.dart';
+import 'package:window_manager/window_manager.dart';
 import 'search_playlist_controller.dart';
 import 'package:tono_music/app/widgets/global_mini_player.dart';
-import 'package:tono_music/app/ui/root/root_controller.dart';
-import 'package:flutter/rendering.dart';
 
 class SearchPlaylistView extends GetView<SearchPlaylistController> {
   const SearchPlaylistView({super.key});
+
+  static const double _kGridItemMainExtent = 232.0; // 默认主轴高度（非 Windows 回退）
 
   @override
   Widget build(BuildContext context) {
@@ -26,15 +27,47 @@ class SearchPlaylistView extends GetView<SearchPlaylistController> {
         }
 
         final width = MediaQuery.of(context).size.width;
-        final crossAxisCount = width >= 1200
-            ? 6
-            : width >= 1000
-            ? 5
-            : width >= 800
-            ? 4
-            : width >= 600
-            ? 3
-            : 2;
+        // 扩展到 4K 的列数断点
+        final int crossAxisCount;
+        if (width >= 3840) {
+          crossAxisCount = 13;
+        } else if (width >= 3200) {
+          crossAxisCount = 12;
+        } else if (width >= 2880) {
+          crossAxisCount = 11;
+        } else if (width >= 2560) {
+          crossAxisCount = 10;
+        } else if (width >= 2240) {
+          crossAxisCount = 9;
+        } else if (width >= 1920) {
+          crossAxisCount = 8;
+        } else if (width >= 1600) {
+          crossAxisCount = 7;
+        } else if (width >= 1366) {
+          crossAxisCount = 6;
+        } else if (width >= 1000) {
+          crossAxisCount = 5;
+        } else if (width >= 800) {
+          crossAxisCount = 4;
+        } else if (width >= 600) {
+          crossAxisCount = 3;
+        } else {
+          crossAxisCount = 2;
+        }
+
+        double mainExtent = _kGridItemMainExtent;
+        if (Platform.isWindows) {
+          const double padding = 12.0;
+          const double spacing = 6.0;
+          const double aspect = 0.8;
+          final double gridWidth = width - padding * 2;
+          final double itemWidth =
+              (gridWidth - spacing * (crossAxisCount - 1)) / crossAxisCount;
+          if (itemWidth.isFinite && itemWidth > 0) {
+            mainExtent = itemWidth / aspect;
+            mainExtent = mainExtent.clamp(200.0, 360.0);
+          }
+        }
 
         return SizedBox.expand(
           child: RefreshIndicator(
@@ -47,27 +80,21 @@ class SearchPlaylistView extends GetView<SearchPlaylistController> {
                     controller.loadMore();
                   }
                 }
-                if (n is UserScrollNotification) {
-                  final root = Get.find<RootController>();
-                  if (n.direction == ScrollDirection.reverse &&
-                      (Platform.isAndroid || Platform.isIOS)) {
-                    root.setShowBars(false);
-                  } else if (n.direction == ScrollDirection.forward) {
-                    root.setShowBars(true);
-                  }
-                }
+                // 搜索页无需顶部/底部隐藏逻辑
                 return false;
               },
               child: CustomScrollView(
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.all(12),
+
                     sliver: SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
                         mainAxisSpacing: 6,
                         crossAxisSpacing: 6,
-                        childAspectRatio: 0.72,
+                        // 固定主轴高度（Windows 自适应，其它平台默认值）
+                        mainAxisExtent: mainExtent,
                       ),
                       delegate: SliverChildBuilderDelegate((context, i) {
                         final playlist = playlists[i];
@@ -84,7 +111,7 @@ class SearchPlaylistView extends GetView<SearchPlaylistController> {
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.only(top: 6, bottom: 76),
                       child: Center(
                         child: Obx(() {
                           if (controller.hasMore.value) {
@@ -111,7 +138,12 @@ class SearchPlaylistView extends GetView<SearchPlaylistController> {
       }
 
       return Scaffold(
-        appBar: AppBar(title: Obx(() => Text('搜索歌单：${controller.keyword}'))),
+        appBar: AppBar(
+          title: Obx(
+            () => DragToMoveArea(child: Text('搜索歌单：${controller.keyword}')),
+          ),
+          flexibleSpace: const DragToMoveArea(child: SizedBox.expand()),
+        ),
         body: Stack(
           children: [
             Padding(padding: const EdgeInsets.all(12.0), child: buildGrid()),

@@ -18,7 +18,8 @@ class RootView extends GetView<RootController> {
     return Obx(() {
       final idx = controller.index.value;
       final isWide = MediaQuery.of(context).size.width >= 900;
-      final showBars = controller.showBars.value;
+      final showTop = controller.showTop.value;
+      final showBottom = controller.showBottom.value;
 
       final pages = const <Widget>[
         SquareView(),
@@ -30,7 +31,7 @@ class RootView extends GetView<RootController> {
 
       final Widget page = isWide
           ? Scaffold(
-              appBar: showBars
+              appBar: showTop
                   ? const DesktopTitleBar(title: 'TonoMusic')
                   : null,
               body: Column(
@@ -76,7 +77,7 @@ class RootView extends GetView<RootController> {
               ),
             )
           : Scaffold(
-              appBar: showBars
+              appBar: showTop
                   ? const DesktopTitleBar(title: 'TonoMusic')
                   : null,
               body: content,
@@ -84,7 +85,7 @@ class RootView extends GetView<RootController> {
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeInOut,
                 child: SizedBox(
-                  height: showBars ? null : 0,
+                  height: showBottom ? null : 0,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [

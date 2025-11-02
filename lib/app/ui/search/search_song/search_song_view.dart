@@ -10,6 +10,8 @@ import 'package:tono_music/app/services/app_cache_manager.dart';
 class SearchSongView extends GetView<SearchSongController> {
   const SearchSongView({super.key});
 
+  static const double _kRowHeight = 72.0; // 固定子项高度，提升滚动性能
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,94 +32,89 @@ class SearchSongView extends GetView<SearchSongController> {
               if (controller.tracks.isEmpty) {
                 return const Center(child: Text('未找到歌曲'));
               }
-              return ListView.separated(
+              return ListView.builder(
                 controller: controller.scrollController,
+                padding: const EdgeInsets.only(bottom: 64),
+                itemExtent: _kRowHeight,
                 itemCount: controller.tracks.length + 1,
-                separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (_, i) {
                   return Obx(() {
                     if (i == controller.tracks.length) {
                       // 底部加载指示
                       if (controller.loadingMore.value) {
-                        return const Padding(
-                          padding: EdgeInsets.only(
-                            left: 12,
-                            right: 12,
-                            top: 12,
-                            bottom: 64,
-                          ),
-                          child: Center(
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                        return const Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         );
                       }
                       if (!controller.hasMore.value) {
-                        return const Padding(
-                          padding: EdgeInsets.only(
-                            left: 12,
-                            right: 12,
-                            top: 12,
-                            bottom: 64,
-                          ),
-                          child: Center(child: Text('没有更多了')),
-                        );
+                        return const Center(child: Text('没有更多了'));
                       }
                       return const SizedBox.shrink();
                     }
                     final s = controller.tracks[i];
-                    return ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: CachedNetworkImage(
-                          imageUrl: s.picUrl,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          cacheManager: AppCacheManager.instance,
-                          placeholder: (_, __) => const SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: ColoredBox(color: Color(0xFFF5F5F5)),
-                          ),
-                          errorWidget: (_, __, ___) => const SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: ColoredBox(color: Color(0xFFEFEFEF)),
+                    return DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Theme.of(context).dividerColor,
+                            width: 1,
                           ),
                         ),
                       ),
-                      title: Text(
-                        s.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        s.artists.join('/'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: Text(_fmtDuration(s.duration)),
-                      onTap: () async {
-                        final p = Get.find<PlayerService>();
-                        await p.setQueueFromPlaylist(
-                          [
-                            PlayItem(
-                              id: s.id,
-                              source: controller.source.value,
-                              name: s.name,
-                              coverUrl: s.picUrl,
-                              duration: s.duration,
-                              artists: s.artists,
+                      child: ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: CachedNetworkImage(
+                            imageUrl: s.picUrl,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            cacheManager: AppCacheManager.instance,
+                            placeholder: (_, __) => const SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: ColoredBox(color: Color(0xFFF5F5F5)),
                             ),
-                          ],
-                          startId: s.id,
-                          startSource: controller.source.value,
-                        );
-                      },
+                            errorWidget: (_, __, ___) => const SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: ColoredBox(color: Color(0xFFEFEFEF)),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          s.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          s.artists.join('/'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(_fmtDuration(s.duration)),
+                        onTap: () async {
+                          final p = Get.find<PlayerService>();
+                          await p.setQueueFromPlaylist(
+                            [
+                              PlayItem(
+                                id: s.id,
+                                source: controller.source.value,
+                                name: s.name,
+                                coverUrl: s.picUrl,
+                                duration: s.duration,
+                                artists: s.artists,
+                              ),
+                            ],
+                            startId: s.id,
+                            startSource: controller.source.value,
+                          );
+                        },
+                      ),
                     );
                   });
                 },

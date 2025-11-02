@@ -11,6 +11,8 @@ import 'package:tono_music/app/services/app_cache_manager.dart';
 class PlaylistDetailView extends GetView<PlaylistDetailController> {
   const PlaylistDetailView({super.key});
 
+  static const double _kRowHeight = 72.0; // 固定子项高度，优化列表性能
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -129,36 +131,36 @@ class PlaylistDetailView extends GetView<PlaylistDetailController> {
                   Expanded(
                     child: RefreshIndicator(
                       onRefresh: controller.refresh,
-                      child: ListView.separated(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 64),
+                        itemExtent: _kRowHeight,
                         itemCount:
                             tracks.length +
                             (controller.streaming.value ? 1 : 0),
-                        separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (_, i) {
                           final isStreaming = controller.streaming.value;
-                          // 尾部 loading 行
                           if (isStreaming && i == tracks.length) {
-                            return const Padding(
-                              padding: EdgeInsets.only(top: 12, bottom: 64),
-                              child: Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
+                            return const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
                               ),
                             );
                           }
 
                           final song = tracks[i];
-                          final isLastReal =
-                              (i == tracks.length - 1) && !isStreaming;
-                          return Padding(
-                            padding: isLastReal
-                                ? const EdgeInsets.only(bottom: 64)
-                                : const EdgeInsets.only(bottom: 0),
+                          return DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: Get.theme.dividerColor,
+                                  width: 0.5,
+                                ),
+                              ),
+                            ),
                             child: ListTile(
                               leading: ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
