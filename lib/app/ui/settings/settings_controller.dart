@@ -146,13 +146,9 @@ class SettingsController extends GetxController {
     overlayEnabled.value = prefs.getBool('overlayEnabled') ?? false;
     overlayClickThrough.value = prefs.getBool('overlayClickThrough') ?? false;
     overlayFontSize.value = prefs.getInt('overlayFontSize') ?? 20;
-    // 兼容旧的背景不透明度字段，优先读取新的文字不透明度
     final int? textOpacityPref = prefs.getInt('overlayTextOpacity');
     if (textOpacityPref != null) {
       overlayTextOpacity.value = textOpacityPref.clamp(0, 255);
-    } else {
-      final int oldBg = prefs.getInt('overlayBgOpacity') ?? 255;
-      overlayTextOpacity.value = oldBg.clamp(0, 255);
     }
     overlayFontFamily.value =
         prefs.getString('overlayFontFamily') ?? 'Segoe UI';
@@ -160,7 +156,7 @@ class SettingsController extends GetxController {
     if (weightPref != null) {
       overlayFontWeight.value = weightPref.clamp(100, 900);
     } else {
-      overlayFontWeight.value = 400;
+      overlayFontWeight.value = 500;
     }
     overlayTextColor.value = prefs.getInt('overlayTextColor') ?? 0xFFFFFF;
     overlayWidth.value = (prefs.getInt('overlayWidth') ?? 600).clamp(200, 1920);

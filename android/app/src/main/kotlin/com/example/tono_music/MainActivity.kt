@@ -11,6 +11,8 @@ class MainActivity : FlutterActivity() {
 		super.configureFlutterEngine(flutterEngine)
 		// Register native notification channels (method + event)
 		NotificationModule.register(flutterEngine, this)
+			// Register lyrics overlay channel for Android implementation
+			LyricsOverlayModule.register(flutterEngine, this)
 		MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
 			.setMethodCallHandler { call, result ->
 				when (call.method) {
@@ -24,7 +26,4 @@ class MainActivity : FlutterActivity() {
 			}
 	}
 
-	override fun onBackPressed() {
-		super.onBackPressed()
-	}
 }

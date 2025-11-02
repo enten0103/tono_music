@@ -2,7 +2,7 @@ name: tono_music
 description: "TonoMusic Application Based on Flutter"
 publish_to: 'none' 
 
-version: 1.0.3
+version: 1.0.4
 
 environment:
   sdk: ^3.9.2

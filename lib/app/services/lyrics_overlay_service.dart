@@ -194,6 +194,4 @@ class LyricsOverlayService {
       return false;
     }
   }
-
-  bool get isClickThrough => isLock;
 }

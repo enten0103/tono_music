@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:screen_retriever/screen_retriever.dart';
@@ -307,7 +308,7 @@ class OverlaySettingsView extends GetView<SettingsController> {
                             Text('0x$hex'),
                             const SizedBox(width: 12),
                             IconButton(
-                              tooltip: '手动输入颜色 (Hex 或 R,G,B)',
+                              tooltip: '手动输入颜色',
                               icon: const Icon(Icons.edit),
                               onPressed: () async {
                                 final TextEditingController txt =
@@ -315,7 +316,7 @@ class OverlaySettingsView extends GetView<SettingsController> {
                                 final res = await showDialog<String>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
-                                    title: const Text('输入颜色 (Hex 或 R,G,B)'),
+                                    title: const Text('输入颜色'),
                                     content: TextField(
                                       controller: txt,
                                       decoration: const InputDecoration(
@@ -404,47 +405,100 @@ class OverlaySettingsView extends GetView<SettingsController> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Obx(() => Text('宽度：${controller.overlayWidth.value} px')),
-                      FutureBuilder<Display?>(
-                        future: ScreenRetriever.instance.getPrimaryDisplay(),
-                        builder: (context, snap) {
-                          final display = snap.data;
-                          double maxW = 1920;
-                          if (display != null) {
-                            final num scaleN = (display.scaleFactor ?? 1);
-                            double scale = scaleN.toDouble();
-                            if (scale == 0) scale = 1.0;
-                            final wpx = display.size.width.toDouble();
-                            maxW = (wpx / scale).toDouble();
-                            if (maxW < 200) maxW = 200;
-                          }
-                          return Obx(() {
-                            final v = controller.overlayWidth.value.toDouble();
-                            final double value = v
-                                .clamp(200.0, maxW)
-                                .toDouble();
-                            final int divisions = (maxW - 200)
-                                .clamp(1, 2000)
-                                .toInt();
-                            return Slider(
-                              value: value,
-                              min: 200,
-                              max: maxW,
-                              divisions: divisions,
-                              label: '${value.round()} px',
-                              onChanged: (nv) {
-                                final clamped = nv
-                                    .clamp(200.0, maxW)
-                                    .toDouble();
-                                controller.overlayWidth.value = clamped.round();
-                              },
-                              onChangeEnd: (nv) {
-                                final clamped = nv
-                                    .clamp(200.0, maxW)
-                                    .toDouble();
-                                controller.setOverlayWidth(clamped.round());
+                      Builder(
+                        builder: (context) {
+                          final bool isDesktop =
+                              !kIsWeb &&
+                              (defaultTargetPlatform ==
+                                      TargetPlatform.windows ||
+                                  defaultTargetPlatform ==
+                                      TargetPlatform.linux ||
+                                  defaultTargetPlatform ==
+                                      TargetPlatform.macOS);
+                          if (isDesktop) {
+                            return FutureBuilder<Display?>(
+                              future: ScreenRetriever.instance
+                                  .getPrimaryDisplay(),
+                              builder: (context, snap) {
+                                final display = snap.data;
+                                double maxW = 1920;
+                                if (display != null) {
+                                  final num scaleN = (display.scaleFactor ?? 1);
+                                  double scale = scaleN.toDouble();
+                                  if (scale == 0) scale = 1.0;
+                                  final wpx = display.size.width.toDouble();
+                                  maxW = (wpx / scale).toDouble();
+                                }
+                                if (maxW < 200) maxW = 200;
+                                return Obx(() {
+                                  final v = controller.overlayWidth.value
+                                      .toDouble();
+                                  final double value = v
+                                      .clamp(200.0, maxW)
+                                      .toDouble();
+                                  final int divisions = (maxW - 200)
+                                      .clamp(1, 2000)
+                                      .toInt();
+                                  return Slider(
+                                    value: value,
+                                    min: 200,
+                                    max: maxW,
+                                    divisions: divisions,
+                                    label: '${value.round()} px',
+                                    onChanged: (nv) {
+                                      final clamped = nv
+                                          .clamp(200.0, maxW)
+                                          .toDouble();
+                                      controller.overlayWidth.value = clamped
+                                          .round();
+                                    },
+                                    onChangeEnd: (nv) {
+                                      final clamped = nv
+                                          .clamp(200.0, maxW)
+                                          .toDouble();
+                                      controller.setOverlayWidth(
+                                        clamped.round(),
+                                      );
+                                    },
+                                  );
+                                });
                               },
                             );
-                          });
+                          } else {
+                            // Mobile/web: use logical width
+                            double maxW = Get.width;
+                            if (maxW < 200) maxW = 200;
+                            return Obx(() {
+                              final v = controller.overlayWidth.value
+                                  .toDouble();
+                              final double value = v
+                                  .clamp(200.0, maxW)
+                                  .toDouble();
+                              final int divisions = (maxW - 200)
+                                  .clamp(1, 2000)
+                                  .toInt();
+                              return Slider(
+                                value: value,
+                                min: 200,
+                                max: maxW,
+                                divisions: divisions,
+                                label: '${value.round()} px',
+                                onChanged: (nv) {
+                                  final clamped = nv
+                                      .clamp(200.0, maxW)
+                                      .toDouble();
+                                  controller.overlayWidth.value = clamped
+                                      .round();
+                                },
+                                onChangeEnd: (nv) {
+                                  final clamped = nv
+                                      .clamp(200.0, maxW)
+                                      .toDouble();
+                                  controller.setOverlayWidth(clamped.round());
+                                },
+                              );
+                            });
+                          }
                         },
                       ),
                       const SizedBox(height: 8),
@@ -574,6 +628,73 @@ class OverlaySettingsView extends GetView<SettingsController> {
                             ),
                             const SizedBox(width: 12),
                             Text('0x$hex'),
+                            const SizedBox(width: 12),
+                            IconButton(
+                              tooltip: '手动输入描边颜色',
+                              icon: const Icon(Icons.edit),
+                              onPressed: () async {
+                                final TextEditingController txt =
+                                    TextEditingController(text: '');
+                                final res = await showDialog<String>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('输入描边颜色'),
+                                    content: TextField(
+                                      controller: txt,
+                                      decoration: const InputDecoration(
+                                        hintText: '#RRGGBB 或 R,G,B',
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(),
+                                        child: const Text('取消'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(
+                                          ctx,
+                                        ).pop(txt.text.trim()),
+                                        child: const Text('应用'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (res != null && res.isNotEmpty) {
+                                  int? parsed;
+                                  final s = res.trim();
+                                  try {
+                                    if (s.startsWith('#')) {
+                                      parsed = int.parse(
+                                        s.substring(1),
+                                        radix: 16,
+                                      );
+                                    } else if (s.contains(',')) {
+                                      final parts = s
+                                          .split(',')
+                                          .map((p) => int.parse(p.trim()))
+                                          .toList();
+                                      if (parts.length >= 3) {
+                                        final r = parts[0].clamp(0, 255);
+                                        final g = parts[1].clamp(0, 255);
+                                        final b = parts[2].clamp(0, 255);
+                                        parsed = (r << 16) | (g << 8) | b;
+                                      }
+                                    } else {
+                                      parsed = int.parse(
+                                        s,
+                                        radix: s.startsWith('0x') ? 16 : 16,
+                                      );
+                                    }
+                                  } catch (_) {
+                                    parsed = null;
+                                  }
+                                  if (parsed != null) {
+                                    controller.setOverlayStrokeColor(parsed);
+                                  }
+                                }
+                              },
+                            ),
                           ],
                         );
                       }),

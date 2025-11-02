@@ -68,4 +68,6 @@ flutter {
 dependencies {
     // For MediaStyle notifications (androidx.media.app.NotificationCompat)
     implementation("androidx.media:media:1.7.0")
+    // For AppCompatTextView and AppCompat support used by overlay view
+    implementation("androidx.appcompat:appcompat:1.7.0")
 }

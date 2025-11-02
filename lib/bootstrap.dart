@@ -46,20 +46,22 @@ Future<void> initDependencies() async {
   Get.put<PluginService>(pluginService);
   pluginService.init();
 
+  final lyricsController = await LyricsOverlayController().init();
+  Get.put<LyricsOverlayController>(lyricsController);
+
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
     final trayService = await TrayService().init();
     Get.put<TrayService>(trayService);
-    final lyricsController = await LyricsOverlayController().init();
-    Get.put<LyricsOverlayController>(lyricsController);
-  }
-  if (Platform.isAndroid) {
-    final notificationService = await NotificationService().init();
-    Get.put<NotificationService>(notificationService);
   }
   if (Platform.isWindows) {
     final smtcService = await SMTCService().init();
     Get.put<SMTCService>(smtcService);
   }
+  if (Platform.isAndroid) {
+    final notificationService = await NotificationService().init();
+    Get.put<NotificationService>(notificationService);
+  }
+
   final SettingsController settingsController = SettingsController();
   Get.put<SettingsController>(settingsController, permanent: true);
 }

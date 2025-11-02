@@ -71,7 +71,7 @@ TonoMusic是一个基于flutter的LxMusic插件兼容项目，其通过flutter_j
 - [ ] andorid
     - [x] 通知栏
     - [ ] 标准控制
-    - [ ] 桌面歌词
+    - [x] 桌面歌词
 - [ ] ios
     - [ ] 通知栏
     - [ ] 标准控制

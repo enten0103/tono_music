@@ -53,7 +53,7 @@ class TrayService extends GetxService with TrayListener {
 
   Future<Menu> _buildMenu() async {
     final isPlaying = _player.playing.value;
-    final isClickThrough = LyricsOverlayService.instance.isClickThrough;
+    final isClickThrough = LyricsOverlayService.instance.isLock;
     final lockLabel = isClickThrough ? '解锁歌词（允许交互）' : '锁定歌词（点击穿透）';
     return Menu(
       items: [
@@ -127,11 +127,9 @@ class TrayService extends GetxService with TrayListener {
       case 'toggle_lyrics_lock':
         try {
           final ctrl = Get.find<LyricsOverlayController>();
-          // toggle click-through based on current known state
-          final current = LyricsOverlayService.instance.isClickThrough;
+          final current = LyricsOverlayService.instance.isLock;
           final newState = !current;
-          await ctrl.toggleClickThrough(newState);
-          // rebuild menu to reflect new label
+          await ctrl.lock(newState);
           try {
             final newMenu = await _buildMenu();
             await trayManager.setContextMenu(newMenu);
