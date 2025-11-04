@@ -8,6 +8,8 @@ import 'package:tono_music/app/services/app_cache_manager.dart';
 class FavoriteView extends GetView<FavoriteController> {
   const FavoriteView({super.key});
 
+  static const double _kRowHeight = 72.0; // 与歌单详情列表一致的固定行高
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -177,61 +179,68 @@ class FavoriteView extends GetView<FavoriteController> {
           Expanded(
             child: active == null
                 ? const Center(child: Text('暂无歌单'))
-                : ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemBuilder: (_, i) {
-                      final it = active.items[i];
-                      return ListTile(
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: CachedNetworkImage(
-                            imageUrl: it.coverUrl,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            cacheManager: AppCacheManager.instance,
-                            placeholder: (_, __) => const SizedBox(
-                              width: 48,
-                              height: 48,
-                              child: ColoredBox(color: Color(0xFFF5F5F5)),
-                            ),
-                            errorWidget: (_, __, ___) => const SizedBox(
-                              width: 48,
-                              height: 48,
-                              child: ColoredBox(color: Color(0xFFEFEFEF)),
+                : Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 64),
+                      itemExtent: _kRowHeight,
+                      itemCount: active.items.length,
+                      itemBuilder: (_, i) {
+                        final it = active.items[i];
+                        return DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Get.theme.dividerColor,
+                                width: 0.5,
+                              ),
                             ),
                           ),
-                        ),
-                        title: Text(it.title),
-                        subtitle: Text(it.artists.join(', ')),
-                        onTap: () async {
-                          final player = Get.find<PlayerService>();
-                          final list = controller.toPlayItemsForPlaylistId(
-                            active.id,
-                          );
-                          await player.setQueueFromPlaylist(
-                            list,
-                            startId: it.id,
-                            startSource: it.source,
-                          );
-                        },
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.play_arrow),
-                              onPressed: () async {
-                                final player = Get.find<PlayerService>();
-                                final list = controller
-                                    .toPlayItemsForPlaylistId(active.id);
-                                await player.setQueueFromPlaylist(
-                                  list,
-                                  startId: it.id,
-                                  startSource: it.source,
-                                );
-                              },
+                          child: ListTile(
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: CachedNetworkImage(
+                                imageUrl: it.coverUrl,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                cacheManager: AppCacheManager.instance,
+                                placeholder: (_, __) => const SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: ColoredBox(color: Color(0xFFF5F5F5)),
+                                ),
+                                errorWidget: (_, __, ___) => const SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: ColoredBox(color: Color(0xFFEFEFEF)),
+                                ),
+                              ),
                             ),
-                            IconButton(
+                            title: Text(
+                              it.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              it.artists.join('/'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            // 行为与歌单详情一致：点整行开始播放该曲目
+                            onTap: () async {
+                              final player = Get.find<PlayerService>();
+                              final list = controller.toPlayItemsForPlaylistId(
+                                active.id,
+                              );
+                              await player.setQueueFromPlaylist(
+                                list,
+                                startId: it.id,
+                                startSource: it.source,
+                              );
+                            },
+                            // 与歌单详情不同之处：保留删除按钮
+                            trailing: IconButton(
                               icon: const Icon(Icons.delete),
                               tooltip: '从当前歌单删除',
                               onPressed: () async {
@@ -242,13 +251,10 @@ class FavoriteView extends GetView<FavoriteController> {
                                 );
                               },
                             ),
-                          ],
-                        ),
-                        onLongPress: null,
-                      );
-                    },
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemCount: active.items.length,
+                          ),
+                        );
+                      },
+                    ),
                   ),
           ),
         ],
